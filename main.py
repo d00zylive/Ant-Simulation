@@ -10,6 +10,11 @@ class Path:
     origin: int
     destination: int
     pheromones: dict[str,float]
+    
+    def __init__(self, origin: int, destination: int, pheromones: dict[str,float]):
+        self.origin = origin
+        self.destination = destination
+        self.pheromones = pheromones
 
     def increase_pheromones(self, type: str, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -17,8 +22,9 @@ class Path:
             self.pheromones[type] = 0
         self.pheromones[type] += amount
         
-    def decay_pheromones(self) -> None:
-        pass
+    def evaporate_pheromones(self, rate: float) -> None:
+        for key in self.pheromones.keys():
+            self.pheromones[key] *= rate
 
 
 class Ant:
