@@ -11,9 +11,12 @@ class Path:
     destination: int
     pheromones: dict[str,float]
 
-    def increase_pheromones(self) -> None:
-        pass
-
+    def increase_pheromones(self, type: str, amount: float) -> None:
+        if not type in self.pheromones.keys():
+            print(f"WARNING: given type not recognised by {self}. Creating new entry.")
+            self.pheromones[type] = 0
+        self.pheromones[type] += amount
+        
     def decay_pheromones(self) -> None:
         pass
 
