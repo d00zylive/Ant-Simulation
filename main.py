@@ -1,10 +1,8 @@
-class Node:
-    id: int
-    x: float
-    y: float
-    facility: str|None
-    paths: list[int]
+import math
 
+nodes: dict[int, Node] = {}
+paths: list[Path] = []
+ants: list[Ant] = []
 
 class Path:
     origin: int
@@ -25,7 +23,25 @@ class Path:
     def evaporate_pheromones(self, rate: float) -> None:
         for key in self.pheromones.keys():
             self.pheromones[key] *= rate
+            
+    def get_length(self) -> float:
+        origin_node, destination_node = nodes[self.origin], nodes[self.destination]
+        return math.sqrt((origin_node.x-destination_node.x)**2+(origin_node.y+destination_node.y)**2)
 
+def get_path(node1: int, node2: int) -> Path|None:
+    for path in paths:
+        if path.origin == node1 and path.destination == node2 or path.destination == node1 and path.origin == node2:
+            return path
+
+class Node:
+    id: int
+    x: float
+    y: float
+    facility: str|None
+    paths: list[int]
+    
+    def get_paths(self) -> list[Path]:
+        pass
 
 class Ant:
     origin: int
@@ -35,8 +51,16 @@ class Ant:
     needs: dict[str,float]
     pheromones: dict[str,float]
 
-    def step(self) -> None:
-        pass
+    def step(self, speed: float) -> None:
+        self.distance += speed
+        path = get_path(self.origin, self.destination)
+        assert path is not None
+        while self.distance >= path.get_length():
+            self.distance -= path.get_length()
+            self.origin = self.destination
+            self.destination = self.choose_path()
+            path = get_path(self.origin, self.destination)
+            assert path is not None
 
     def choose_path(self) -> int:
         pass
