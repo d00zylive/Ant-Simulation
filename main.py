@@ -1,5 +1,10 @@
 import math
 
+PHEROMONES: dict[str,float] = {
+    "grocery store": 0,
+    "house": 0,
+}
+
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
 ants: list[Ant] = []
@@ -38,10 +43,18 @@ class Node:
     x: float
     y: float
     facility: str|None
-    paths: list[int]
+    connections: list[int]
     
     def get_paths(self) -> list[Path]:
-        pass
+        path_objects: list[Path] = []
+        for connection in self.connections:
+            path = get_path(self.id, connection)
+            if path is None:
+                print(f"WARNING: no path between {self} and {nodes[connection]}. Creating new entry.")
+                path = Path(origin=self.id, destination=connection, pheromones=PHEROMONES)
+                paths.append(path)
+            path_objects.append(path)
+        return path_objects
 
 class Ant:
     origin: int
