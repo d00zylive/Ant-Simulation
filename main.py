@@ -63,25 +63,29 @@ class Ant:
     nest: int
     needs: dict[str,float]
     pheromones: dict[str,float]
+    goal: str|None
 
     def step(self, speed: float) -> None:
         self.distance += speed
         path = get_path(self.origin, self.destination)
         assert path is not None
         while self.distance >= path.get_length():
-            self.distance -= path.get_length()
-            self.origin = self.destination
-            self.destination = self.choose_path()
-            path = get_path(self.origin, self.destination)
-            assert path is not None
+            if self.goal is not None and nodes[self.destination].facility == self.goal:
+                self.utilise_facility(self.destination)
+            else:
+                self.distance -= path.get_length()
+                self.origin = self.destination
+                self.destination = self.choose_destination()
+                path = get_path(self.origin, self.destination)
+                assert path is not None
 
-    def choose_path(self) -> int:
-        pass
+    def choose_destination(self) -> int:
+        need = self.get_highest_need()
 
     def get_highest_need(self) -> str:
         pass
 
-    def utilise_facility(self) -> None:
+    def utilise_facility(self, node: int) -> None:
         pass
 
     def drop_pheromones(self) -> None:
