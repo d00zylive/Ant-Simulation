@@ -1,9 +1,11 @@
 import math
+import random
 
 PHEROMONES: dict[str,float] = {
     "grocery store": 0,
     "house": 0,
 }
+WANDERCHANCE = 0.01
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -75,12 +77,30 @@ class Ant:
             else:
                 self.distance -= path.get_length()
                 self.origin = self.destination
-                self.destination = self.choose_destination()
+                self.choose_destination()
                 path = get_path(self.origin, self.destination)
                 assert path is not None
 
-    def choose_destination(self) -> int:
+    def choose_destination(self):
         need = self.get_highest_need()
+        connected_paths = [get_path(self.origin, connection) for connection in nodes[self.origin].connections]
+        assert all([path is not None for path in connected_paths])
+        path_weights: list[float] = []
+        for path in connected_paths:
+            if path is not None:
+                pheromone_amount = path.pheromones[need]
+                if pheromone_amount != 0:
+                    path_weights.append(pheromone_amount)
+                else:
+                    path_weights.append(WANDERCHANCE)
+            else:
+                path_weights.append(0)
+        chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
+        assert chosen_path is not None
+        if chosen_path.origin == self.origin:
+            self.destination = chosen_path.destination
+        else:
+            self.destination = chosen_path.origin
 
     def get_highest_need(self) -> str:
         pass
