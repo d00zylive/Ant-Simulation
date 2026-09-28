@@ -6,6 +6,7 @@ PHEROMONES: dict[str,float] = {
     "house": 0,
 }
 WANDERCHANCE = 0.01
+DROPRATE = 0.01
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -81,7 +82,7 @@ class Ant:
                 path = get_path(self.origin, self.destination)
                 assert path is not None
 
-    def choose_destination(self):
+    def choose_destination(self, wander_chance:float = WANDERCHANCE):
         need = self.get_highest_need()
         assert need is not None
         connected_paths = [get_path(self.origin, connection) for connection in nodes[self.origin].connections]
@@ -93,11 +94,12 @@ class Ant:
                 if pheromone_amount != 0:
                     path_weights.append(pheromone_amount)
                 else:
-                    path_weights.append(WANDERCHANCE)
+                    path_weights.append(wander_chance)
             else:
                 path_weights.append(0)
         chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
         assert chosen_path is not None
+        self.drop_pheromones(chosen_path)
         if chosen_path.origin == self.origin:
             self.destination = chosen_path.destination
         else:
@@ -114,5 +116,8 @@ class Ant:
     def utilise_facility(self, node: int) -> None:
         pass
 
-    def drop_pheromones(self) -> None:
-        pass
+    def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
+        for pheromone in self.pheromones.keys():
+            drop_amount = self.pheromones[pheromone]*drop_rate
+            self.pheromones[pheromone] -= drop_amount
+            path.increase_pheromones(pheromone, drop_amount)
