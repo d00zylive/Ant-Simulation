@@ -83,6 +83,7 @@ class Ant:
 
     def choose_destination(self):
         need = self.get_highest_need()
+        assert need is not None
         connected_paths = [get_path(self.origin, connection) for connection in nodes[self.origin].connections]
         assert all([path is not None for path in connected_paths])
         path_weights: list[float] = []
@@ -102,8 +103,13 @@ class Ant:
         else:
             self.destination = chosen_path.origin
 
-    def get_highest_need(self) -> str:
-        pass
+    def get_highest_need(self) -> str|None:
+        highest_need: str|None = None
+        highest_value: float = -1
+        for need in self.needs.keys():
+            if self.needs[need] > highest_value:
+                highest_need = need
+        return highest_need
 
     def utilise_facility(self, node: int) -> None:
         pass
