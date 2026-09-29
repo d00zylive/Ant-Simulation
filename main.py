@@ -16,7 +16,12 @@ NEEDDECAY = 0.001
 FACILITYUSERATE = 0.1
 FULFILLMENT = 1
 
-WIDTH,HEIGHT=1280,720
+WIDTH,HEIGHT = 1280,720
+MARGIN = 10
+NODECOLOUR = "red"
+NODERADIUS = 5
+PATHCOLOUR = "blue"
+PATHWIDTH = 3
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -27,10 +32,21 @@ class Path:
     destination: int
     pheromones: dict[str,float]
     
-    def __init__(self, origin: int, destination: int, pheromones: dict[str,float]):
+    def __init__(self, origin: int, destination: int, pheromones:dict[str,float]|None = None):
         self.origin = origin
         self.destination = destination
-        self.pheromones = pheromones
+        self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
+        
+    def __repr__(self):
+        return f"Path(origin={self.origin},destination={self.destination},pheromones={self.pheromones})"
+    
+    def __str__(self):
+        return f"Path(origin={nodes[self.origin]},destination={nodes[self.destination]},pheromones={self.pheromones})"
+        
+    def draw(self, surface: pygame.Surface) -> None:
+        start = nodes[self.origin]
+        end = nodes[self.destination]
+        pygame.draw.line(surface, color=PATHCOLOUR, start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -68,8 +84,8 @@ class Node:
     def __repr__(self):
         return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
     
-    def draw(self):
-        pass
+    def draw(self, surface: pygame.Surface):
+        pygame.draw.circle(surface=surface, color=NODECOLOUR,center=(self.x,self.y),radius=NODERADIUS)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -159,12 +175,22 @@ class Ant:
             path.increase_pheromones(pheromone, drop_amount)
           
 if __name__ == "__main__":
-    node_amount = random.randint(10,15) 
+    node_amount = random.randint(10,15)
+    path_amount = random.randint(30,45)
     for i in range(node_amount):
-        nodes[i] = Node(id=i,x=random.random()*WIDTH,y=random.random()*HEIGHT,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=random.choices([i for i in range(node_amount)],k=random.randint(1,node_amount//2)))
-        
-    print(nodes)
-
+        nodes[i] = Node(id=i,x=random.random()*(WIDTH-2*MARGIN)+MARGIN,y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=[])
+        print(nodes[i])
+    print("Initiated nodes")
+    for i in range(path_amount):
+        node1 = random.randint(0, node_amount-1)
+        node2 = random.randint(0, node_amount-1)
+        while node1 != node2 and node2 not in nodes[node1].connections:
+            node2 = random.randint(0, node_amount-1)
+        nodes[node1].connections.append(node2)
+        nodes[node2].connections.append(node1)
+        paths.append(Path(origin=node1,destination=node2))
+        print(str(paths[i]))
+    print("Initiated connections")
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
     clock = pygame.time.Clock()
@@ -178,9 +204,12 @@ if __name__ == "__main__":
         screen.fill("grey")
         
         for node in nodes.values():
-            node.draw()
+            node.draw(screen)
+        for path in paths:
+            path.draw(screen)
         
         pygame.display.flip()
-        clock.tick(10)
+        clock.tick(60)
+        # print(clock.get_fps())
         
     pygame.quit()
