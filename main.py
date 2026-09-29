@@ -51,6 +51,13 @@ class Node:
     facility: str|None
     connections: list[int]
     
+    def __init__(self, id: int, x: float, y: float, facility: str|None, connections: list[int]):
+        self.id = id
+        self.x = x
+        self.y = y
+        self.facility = facility
+        self.connections = connections
+    
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
         for connection in self.connections:
