@@ -23,19 +23,21 @@ NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
     "store": (0,255,0),
     "nest": (255,0,0)
 }
-NODERADIUS = 5
+FACILITYRADIUS = 7
+NODERADIUS = 2
 PATHCOLOURRAMP = 0.01
 PATHWIDTH = 2
 ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
 
-SIMSPEED = 2.5
+SIMSPEED = 10
 ANTSPEED = 100*SIMSPEED/FRAMERATE
 WANDERCHANCE = 0.001
 DROPRATE = 0.5
 NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE
 FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE
-EVAPORATIONRATE = 0.95**(1*SIMSPEED/FRAMERATE)
+PHEROMONERESET = 1
+EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE)
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -61,8 +63,9 @@ class Path:
     def draw(self, surface: pygame.Surface) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
-        ramp = lambda x: (255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
-        pygame.draw.line(surface, color=(round(ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))),round(ramp(self.pheromones["store"]*50)),0), start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
+        ramp = lambda x: min(x*100,255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
+        nest_pheromone_sum = round(ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys())))
+        pygame.draw.line(surface, color=(nest_pheromone_sum,round(ramp(self.pheromones["store"])),0), start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -101,7 +104,8 @@ class Node:
         return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
     
     def draw(self, surface: pygame.Surface):
-        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=(self.x,self.y),radius=NODERADIUS)
+        radius = NODERADIUS if self.facility is None else FACILITYRADIUS
+        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=(self.x,self.y),radius=radius)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -226,11 +230,11 @@ class Ant:
         assert facility is not None
         if facility != "nest":
             self.needs[facility] -= FACILITYUSERATE
-            self.pheromones[facility] += FACILITYUSERATE
+            self.pheromones[facility] = PHEROMONERESET
         else:
             assert node == self.nest
             self.needs[self.nest] -= FACILITYUSERATE
-            self.pheromones[self.nest] += FACILITYUSERATE
+            self.pheromones[self.nest] = PHEROMONERESET
 
     def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
         assert path is not None
@@ -241,9 +245,9 @@ class Ant:
         
           
 if __name__ == "__main__":
-    node_amount = random.randint(10,15)
-    path_amount = random.randint(node_amount,(node_amount*(node_amount-1))//4)
-    ant_amount = random.randint(2,node_amount//2)
+    node_amount = random.randint(25,50)
+    path_amount = random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
+    ant_amount = random.randint(node_amount,node_amount*4)
     for i in range(node_amount):
         if i < len(PHEROMONES):
             facility = PHEROMONES[i]
@@ -251,7 +255,7 @@ if __name__ == "__main__":
             facility = "nest"
         else:
             facility = random.choices(population=[*PHEROMONES,"nest",None],
-                                      weights=[1 if i != len(PHEROMONES)+1 else 20
+                                      weights=[1 if i != len(PHEROMONES)+1 else node_amount*0.75
                                                for i in range(len(PHEROMONES)+2)])[0]
         nodes[i] = Node(id=i,
                         x=random.random()*(WIDTH-2*MARGIN)+MARGIN,
@@ -307,11 +311,13 @@ if __name__ == "__main__":
         for ant in ants:
             ant.step()
             ant.draw(screen)
-        # if ants[0].goal is not None: print(ants[0].goal, ants[0].get_highest_need(), ants[0].needs)
-        # cur_path = get_path(ants[0].origin,ants[0].destination)
-        # if cur_path is not None: print(cur_path.pheromones)
+        if ants[0].goal is not None: print(ants[0].pheromones)
+        cur_path = get_path(ants[0].origin,ants[0].destination)
+        if cur_path is not None: print(cur_path.pheromones)
         pygame.display.flip()
         clock.tick(FRAMERATE)
         # print(clock.get_fps())
         
     pygame.quit()
+    
+# TODO: JSON graphs
