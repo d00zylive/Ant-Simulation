@@ -2,7 +2,7 @@ import math
 import random
 import pygame
 
-PHEROMONES: list[str] = ["grocery store", "house"]
+PHEROMONES: list[str] = ["grocery store", "nest"]
 
 def initiate_pheromone_dict() -> dict[str,float]:
     pheromones:dict[str,float] = {}
@@ -19,13 +19,15 @@ FULFILLMENT = 1
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
-    None: "black",
-    "grocery store": "green",
-    "house": "red"
+    None: (0,0,0),
+    "grocery store": (0,0,255),
+    "nest": (255,0,0)
 }
 NODERADIUS = 5
-PATHCOLOUR = "blue"
+PATHCOLOUR = (0,0,0)
 PATHWIDTH = 1
+ANTCOLOUR = (0,255,0)
+ANTSIZE = 8
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -119,6 +121,23 @@ class Ant:
         self.needs = needs if needs is not None else initiate_pheromone_dict()
         self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
         self.goal = goal
+    
+    def get_pos(self) -> tuple[float,float]:
+        if self.origin != self.destination:
+            origin = nodes[self.origin]
+            destination = nodes[self.destination]
+            distance = math.sqrt((origin.x-destination.x)**2+(origin.y-destination.y)**2)
+            fraction_traveled = self.distance/distance
+            x = origin.x+fraction_traveled*(destination.x-origin.x)
+            y = origin.y+fraction_traveled*(destination.y-origin.y)
+        else:
+            origin = nodes[self.origin]
+            x,y = origin.x, origin.y
+        return (x,y)
+    
+    def draw(self, surface: pygame.Surface):
+        x,y = self.get_pos()
+        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect((x-ANTSIZE/2),(y-ANTSIZE/2),ANTSIZE,ANTSIZE))
 
     def step(self, speed: float) -> None:
         self.distance += speed
@@ -181,6 +200,7 @@ class Ant:
 if __name__ == "__main__":
     node_amount = random.randint(5,10)
     path_amount = random.randint(node_amount,(node_amount*(node_amount-1))//4)
+    ant_amount = random.randint(1,node_amount//2)
     for i in range(node_amount):
         if i < len(PHEROMONES):
             facility = PHEROMONES[i]
@@ -206,6 +226,13 @@ if __name__ == "__main__":
         nodes[node2].connections.append(node1)
         paths.append(Path(origin=node1,destination=node2))
     print("Initiated paths")
+    for i in range(ant_amount):
+        nests:list[int] = []
+        for node in nodes.values():
+            if node.facility == "nest":
+                nests.append(node.id)
+        ants.append(Ant(origin=random.choice(nests)))
+    print("Initiated ants")
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
     clock = pygame.time.Clock()
@@ -216,12 +243,14 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 running = False
         
-        screen.fill("grey")
+        screen.fill((255,255,255))
         
         for node in nodes.values():
             node.draw(screen)
         for path in paths:
             path.draw(screen)
+        for ant in ants:
+            ant.draw(screen)
         
         pygame.display.flip()
         clock.tick(60)
