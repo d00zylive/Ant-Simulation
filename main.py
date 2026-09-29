@@ -1,10 +1,13 @@
 import math
 import random
 
-PHEROMONES: dict[str,float] = {
-    "grocery store": 0,
-    "house": 0,
-}
+PHEROMONES: list[str] = ["grocery store", "house"]
+def initiate_pheromone_dict() -> dict[str,float]:
+    pheromones:dict[str,float] = {}
+    for pheromone in PHEROMONES:
+        pheromones[pheromone] = 0
+    return pheromones
+
 WANDERCHANCE = 0.01
 DROPRATE = 0.01
 
@@ -67,6 +70,15 @@ class Ant:
     needs: dict[str,float]
     pheromones: dict[str,float]
     goal: str|None
+    
+    def __init__(self, origin: int, destination:int|None = None, distance:float = 0, nest:int|None = None, needs:dict[str,float]|None = None, pheromones:dict[str,float]|None = None, goal:str|None = None):
+        self.origin = origin
+        self.destination = destination if destination is not None else origin
+        self.distance = distance
+        self.nest = nest if nest is not None else origin
+        self.needs = needs if needs is not None else initiate_pheromone_dict()
+        self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
+        self.goal = goal
 
     def step(self, speed: float) -> None:
         self.distance += speed
