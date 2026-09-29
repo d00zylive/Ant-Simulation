@@ -225,6 +225,15 @@ if __name__ == "__main__":
         nodes[node1].connections.append(node2)
         nodes[node2].connections.append(node1)
         paths.append(Path(origin=node1,destination=node2))
+    for node in nodes.values():
+        if len(node.connections) == 0:
+            node2 = random.randint(0, node_amount-1)
+            while node.id == node2:
+                node2 = random.randint(0, node_amount-1)
+            node.connections.append(node2)
+            nodes[node2].connections.append(node.id)
+            paths.append(Path(origin=node.id,destination=node2))
+            
     print("Initiated paths")
     for i in range(ant_amount):
         nests:list[int] = []
