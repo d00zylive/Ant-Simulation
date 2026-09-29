@@ -15,7 +15,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
         pheromones[nest] = value
     return pheromones
 
-FRAMERATE = 60
+FRAMERATE = 10
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
@@ -31,11 +31,11 @@ ANTSIZE = 8
 
 SIMSPEED = 2.5
 ANTSPEED = 100*SIMSPEED/FRAMERATE
-WANDERCHANCE = 0.01
+WANDERCHANCE = 0.001
 DROPRATE = 0.5
 NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE
 FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE
-EVAPORATIONRATE = 0.99**(1*SIMSPEED/FRAMERATE)
+EVAPORATIONRATE = 0.95**(1*SIMSPEED/FRAMERATE)
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -168,9 +168,8 @@ class Ant:
                 self.choose_destination()
                 path = get_path(self.origin, self.destination)
                 assert path is not None
-                self.drop_pheromones(path)
             while self.distance >= path.get_length():
-                if self.goal is not None and (self.origin == self.goal or nodes[self.origin].facility == self.goal) and self.needs[self.goal] > 0:
+                if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
                     self.utilise_facility(self.destination)
                     self.distance = path.get_length()
                     break
@@ -181,10 +180,8 @@ class Ant:
                     self.choose_destination(previous_node=previous_node)
                     path = get_path(self.origin, self.destination)
                     assert path is not None
-                    self.drop_pheromones(path)
 
     def choose_destination(self, previous_node:int|None = None, wander_chance:float = WANDERCHANCE):
-        print(self.goal, self.nest)
         if self.goal is not None and self.needs[self.goal] > 0:
             need = self.goal
         else:
@@ -231,8 +228,9 @@ class Ant:
             self.needs[facility] -= FACILITYUSERATE
             self.pheromones[facility] += FACILITYUSERATE
         else:
-            self.needs[self.origin] -= FACILITYUSERATE
-            self.pheromones[self.origin] += FACILITYUSERATE
+            assert node == self.nest
+            self.needs[self.nest] -= FACILITYUSERATE
+            self.pheromones[self.nest] += FACILITYUSERATE
 
     def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
         assert path is not None
@@ -309,9 +307,9 @@ if __name__ == "__main__":
         for ant in ants:
             ant.step()
             ant.draw(screen)
-        if ants[0].goal is not None: print(ants[0].goal, ants[0].get_highest_need(), ants[0].needs)
-        cur_path = get_path(ants[0].origin,ants[0].destination)
-        if cur_path is not None: print(cur_path.pheromones)
+        # if ants[0].goal is not None: print(ants[0].goal, ants[0].get_highest_need(), ants[0].needs)
+        # cur_path = get_path(ants[0].origin,ants[0].destination)
+        # if cur_path is not None: print(cur_path.pheromones)
         pygame.display.flip()
         clock.tick(FRAMERATE)
         # print(clock.get_fps())
