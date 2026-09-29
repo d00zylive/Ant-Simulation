@@ -2,6 +2,7 @@ import math
 import random
 
 PHEROMONES: list[str] = ["grocery store", "house"]
+
 def initiate_pheromone_dict() -> dict[str,float]:
     pheromones:dict[str,float] = {}
     for pheromone in PHEROMONES:
@@ -10,6 +11,9 @@ def initiate_pheromone_dict() -> dict[str,float]:
 
 WANDERCHANCE = 0.01
 DROPRATE = 0.01
+NEEDDECAY = 0.001
+FACILITYUSERATE = 0.1
+FULFILLMENT = 1
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -64,7 +68,7 @@ class Node:
             path = get_path(self.id, connection)
             if path is None:
                 print(f"WARNING: no path between {self} and {nodes[connection]}. Creating new entry.")
-                path = Path(origin=self.id, destination=connection, pheromones=PHEROMONES)
+                path = Path(origin=self.id, destination=connection, pheromones=initiate_pheromone_dict())
                 paths.append(path)
             path_objects.append(path)
         return path_objects
@@ -92,8 +96,9 @@ class Ant:
         path = get_path(self.origin, self.destination)
         assert path is not None
         while self.distance >= path.get_length():
-            if self.goal is not None and nodes[self.destination].facility == self.goal:
+            if self.goal is not None and nodes[self.destination].facility == self.goal and self.needs[self.goal] <= FULFILLMENT:
                 self.utilise_facility(self.destination)
+                break
             else:
                 self.distance -= path.get_length()
                 self.origin = self.destination
@@ -133,7 +138,10 @@ class Ant:
         return highest_need
 
     def utilise_facility(self, node: int) -> None:
-        pass
+        facility = nodes[node].facility
+        assert facility is not None
+        self.needs[facility] += FACILITYUSERATE
+        self.pheromones[facility] += FACILITYUSERATE
 
     def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
         for pheromone in self.pheromones.keys():
