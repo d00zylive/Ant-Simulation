@@ -1,5 +1,6 @@
 import math
 import random
+import pygame
 
 PHEROMONES: list[str] = ["grocery store", "house"]
 
@@ -15,7 +16,7 @@ NEEDDECAY = 0.001
 FACILITYUSERATE = 0.1
 FULFILLMENT = 1
 
-WIDTH,HEIGHT=1920,1080
+WIDTH,HEIGHT=1280,720
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -66,6 +67,9 @@ class Node:
         
     def __repr__(self):
         return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
+    
+    def draw(self):
+        pass
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -154,8 +158,29 @@ class Ant:
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
           
-node_amount = random.randint(10,15) 
-for i in range(node_amount):
-    nodes[i] = Node(id=i,x=random.random()*WIDTH,y=random.random()*HEIGHT,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=random.choices([i for i in range(node_amount)],k=random.randint(1,node_amount//2)))
+if __name__ == "__main__":
+    node_amount = random.randint(10,15) 
+    for i in range(node_amount):
+        nodes[i] = Node(id=i,x=random.random()*WIDTH,y=random.random()*HEIGHT,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=random.choices([i for i in range(node_amount)],k=random.randint(1,node_amount//2)))
+        
+    print(nodes)
+
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH,HEIGHT))
+    clock = pygame.time.Clock()
+    running = True
     
-print(nodes)
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        
+        screen.fill("grey")
+        
+        for node in nodes.values():
+            node.draw()
+        
+        pygame.display.flip()
+        clock.tick(10)
+        
+    pygame.quit()
