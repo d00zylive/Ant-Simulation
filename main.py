@@ -15,6 +15,8 @@ NEEDDECAY = 0.001
 FACILITYUSERATE = 0.1
 FULFILLMENT = 1
 
+WIDTH,HEIGHT=1920,1080
+
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
 ants: list[Ant] = []
@@ -61,6 +63,9 @@ class Node:
         self.y = y
         self.facility = facility
         self.connections = connections
+        
+    def __repr__(self):
+        return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -148,3 +153,9 @@ class Ant:
             drop_amount = self.pheromones[pheromone]*drop_rate
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
+          
+node_amount = random.randint(10,15) 
+for i in range(node_amount):
+    nodes[i] = Node(id=i,x=random.random()*WIDTH,y=random.random()*HEIGHT,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=random.choices([i for i in range(node_amount)],k=random.randint(1,node_amount//2)))
+    
+print(nodes)
