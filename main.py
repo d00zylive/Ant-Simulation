@@ -2,12 +2,17 @@ import math
 import random
 import pygame
 
-PHEROMONES: list[str] = ["grocery store", "nest"]
+PHEROMONES: list[str] = ["store"]
 
-def initiate_pheromone_dict(value:float = 0) -> dict[str,float]:
-    pheromones:dict[str,float] = {}
+def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|int,float]:
+    pheromones:dict[str|int,float] = {}
     for pheromone in PHEROMONES:
         pheromones[pheromone] = value
+    if nest is None:
+        for nest_node in nests:
+            pheromones[nest_node] = value
+    else:
+        pheromones[nest] = value
     return pheromones
 
 FRAMERATE = 60
@@ -15,32 +20,34 @@ WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
     None: (0,0,0),
-    "grocery store": (0,0,255),
+    "store": (0,255,0),
     "nest": (255,0,0)
 }
 NODERADIUS = 5
-PATHCOLOUR = (0,0,0)
-PATHWIDTH = 1
-ANTCOLOUR = (0,255,0)
+PATHCOLOURRAMP = 0.01
+PATHWIDTH = 2
+ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
 
-ANTSPEED = 100/FRAMERATE
-WANDERCHANCE = 0.01/FRAMERATE
-DROPRATE = 0.01/FRAMERATE
-NEEDDECAY = 0.001/FRAMERATE
-FACILITYUSERATE = 0.1/FRAMERATE
-FULFILLMENT = 1
+SIMSPEED = 2.5
+ANTSPEED = 100*SIMSPEED/FRAMERATE
+WANDERCHANCE = 0.01
+DROPRATE = 0.5
+NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE
+FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE
+EVAPORATIONRATE = 0.99**(1*SIMSPEED/FRAMERATE)
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
 ants: list[Ant] = []
+nests: list[int] = []
 
 class Path:
     origin: int
     destination: int
-    pheromones: dict[str,float]
+    pheromones: dict[str|int,float]
     
-    def __init__(self, origin: int, destination: int, pheromones:dict[str,float]|None = None):
+    def __init__(self, origin: int, destination: int, pheromones:dict[str|int,float]|None = None):
         self.origin = origin
         self.destination = destination
         self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
@@ -54,21 +61,22 @@ class Path:
     def draw(self, surface: pygame.Surface) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
-        pygame.draw.line(surface, color=PATHCOLOUR, start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
+        ramp = lambda x: (255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
+        pygame.draw.line(surface, color=(round(ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))),round(ramp(self.pheromones["store"]*50)),0), start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
 
-    def increase_pheromones(self, type: str, amount: float) -> None:
+    def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
             print(f"WARNING: given type not recognised by {self}. Creating new entry.")
             self.pheromones[type] = 0
         self.pheromones[type] += amount
         
-    def evaporate_pheromones(self, rate: float) -> None:
+    def evaporate_pheromones(self, rate:float = EVAPORATIONRATE) -> None:
         for key in self.pheromones.keys():
             self.pheromones[key] *= rate
             
     def get_length(self) -> float:
         origin_node, destination_node = nodes[self.origin], nodes[self.destination]
-        return math.sqrt((origin_node.x-destination_node.x)**2+(origin_node.y+destination_node.y)**2)
+        return math.sqrt((origin_node.x-destination_node.x)**2+(origin_node.y-destination_node.y)**2)
 
 def get_path(node1: int, node2: int) -> Path|None:
     for path in paths:
@@ -111,17 +119,17 @@ class Ant:
     destination: int
     distance: float
     nest: int
-    needs: dict[str,float]
-    pheromones: dict[str,float]
-    goal: str|None
+    needs: dict[str|int,float]
+    pheromones: dict[str|int,float]
+    goal: str|int|None
     
-    def __init__(self, origin: int, destination:int|None = None, distance:float = 0, nest:int|None = None, needs:dict[str,float]|None = None, pheromones:dict[str,float]|None = None, goal:str|None = None):
+    def __init__(self, origin: int, destination:int|None = None, distance:float = 0, nest:int|None = None, needs:dict[str|int,float]|None = None, pheromones:dict[str|int,float]|None = None, goal:str|int|None = None):
         self.origin = origin
         self.destination = destination if destination is not None else origin
         self.distance = distance
         self.nest = nest if nest is not None else origin
-        self.needs = needs if needs is not None else initiate_pheromone_dict()
-        self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
+        self.needs = needs if needs is not None else initiate_pheromone_dict(value=1, nest=self.nest)
+        self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict(nest=self.nest)
         self.goal = goal
     
     def get_pos(self) -> tuple[float,float]:
@@ -131,8 +139,11 @@ class Ant:
             path = get_path(self.origin,self.destination)
             assert path is not None
             fraction_traveled = self.distance/path.get_length()
-            x = origin.x+fraction_traveled*(destination.x-origin.x)
-            y = origin.y+fraction_traveled*(destination.y-origin.y)
+            if fraction_traveled <= 1:
+                x = origin.x+fraction_traveled*(destination.x-origin.x)
+                y = origin.y+fraction_traveled*(destination.y-origin.y)
+            else:
+                x,y = destination.x,destination.y
         else:
             origin = nodes[self.origin]
             x,y = origin.x, origin.y
@@ -143,25 +154,38 @@ class Ant:
         pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect((x-ANTSIZE/2),(y-ANTSIZE/2),ANTSIZE,ANTSIZE))
 
     def step(self, speed:float = ANTSPEED) -> None:
-        if self.goal is not None and nodes[self.origin].facility == self.goal and self.needs[self.goal] <= FULFILLMENT:
+        for need in self.needs.keys():
+            self.needs[need] += NEEDGROWTH
+                
+        if self.goal is not None and (self.origin == self.goal or nodes[self.origin].facility == self.goal) and self.needs[self.goal] > 0:
             self.utilise_facility(self.origin)
+            if self.needs[self.goal] <= 0:
+                self.goal = self.get_highest_need()
         else:
             self.distance += speed
             path = get_path(self.origin, self.destination)
-            assert path is not None
+            if path is None:
+                self.choose_destination()
+                path = get_path(self.origin, self.destination)
+                assert path is not None
+                self.drop_pheromones(path)
             while self.distance >= path.get_length():
-                if self.goal is not None and nodes[self.destination].facility == self.goal and self.needs[self.goal] <= FULFILLMENT:
+                if self.goal is not None and (self.origin == self.goal or nodes[self.origin].facility == self.goal) and self.needs[self.goal] > 0:
                     self.utilise_facility(self.destination)
+                    self.distance = path.get_length()
                     break
                 else:
                     self.distance -= path.get_length()
+                    previous_node = self.origin
                     self.origin = self.destination
-                    self.choose_destination()
+                    self.choose_destination(previous_node=previous_node)
                     path = get_path(self.origin, self.destination)
                     assert path is not None
+                    self.drop_pheromones(path)
 
-    def choose_destination(self, wander_chance:float = WANDERCHANCE):
-        if self.goal is not None and self.needs[self.goal] <= FULFILLMENT:
+    def choose_destination(self, previous_node:int|None = None, wander_chance:float = WANDERCHANCE):
+        print(self.goal, self.nest)
+        if self.goal is not None and self.needs[self.goal] > 0:
             need = self.goal
         else:
             need = self.get_highest_need()
@@ -172,11 +196,15 @@ class Ant:
         path_weights: list[float] = []
         for path in connected_paths:
             if path is not None:
+                if previous_node is not None and (previous_node == path.origin or previous_node == path.destination):
+                    modifier = 0.1
+                else:
+                    modifier = 1
                 pheromone_amount = path.pheromones[need]
                 if pheromone_amount != 0:
-                    path_weights.append(pheromone_amount)
+                    path_weights.append(pheromone_amount*modifier)
                 else:
-                    path_weights.append(wander_chance)
+                    path_weights.append(wander_chance*modifier)
             else:
                 path_weights.append(0)
         chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
@@ -187,47 +215,59 @@ class Ant:
         else:
             self.destination = chosen_path.origin
 
-    def get_highest_need(self) -> str|None:
-        highest_need: str|None = None
-        highest_value: float = -1
+    def get_highest_need(self) -> str|int|None:
+        highest_need: str|int|None = None
+        highest_value: float = -math.inf
         for need in self.needs.keys():
             if self.needs[need] > highest_value:
                 highest_need = need
+                highest_value = self.needs[need]
         return highest_need
 
     def utilise_facility(self, node: int) -> None:
         facility = nodes[node].facility
         assert facility is not None
-        self.needs[facility] += FACILITYUSERATE
-        self.pheromones[facility] += FACILITYUSERATE
+        if facility != "nest":
+            self.needs[facility] -= FACILITYUSERATE
+            self.pheromones[facility] += FACILITYUSERATE
+        else:
+            self.needs[self.origin] -= FACILITYUSERATE
+            self.pheromones[self.origin] += FACILITYUSERATE
 
     def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
+        assert path is not None
         for pheromone in self.pheromones.keys():
             drop_amount = self.pheromones[pheromone]*drop_rate
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
+        
           
 if __name__ == "__main__":
-    node_amount = random.randint(5,10)
+    node_amount = random.randint(10,15)
     path_amount = random.randint(node_amount,(node_amount*(node_amount-1))//4)
-    ant_amount = 1#random.randint(1,node_amount//2)
+    ant_amount = random.randint(2,node_amount//2)
     for i in range(node_amount):
         if i < len(PHEROMONES):
             facility = PHEROMONES[i]
+        elif i == len(PHEROMONES):
+            facility = "nest"
         else:
-            facility = random.choices(population=[*PHEROMONES,None],
-                                      weights=[1 if i != len(PHEROMONES) else 20
-                                               for i in range(len(PHEROMONES)+1)])[0]
+            facility = random.choices(population=[*PHEROMONES,"nest",None],
+                                      weights=[1 if i != len(PHEROMONES)+1 else 20
+                                               for i in range(len(PHEROMONES)+2)])[0]
         nodes[i] = Node(id=i,
                         x=random.random()*(WIDTH-2*MARGIN)+MARGIN,
                         y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,
                         facility=facility,
                         connections=[])
     print("Initiated nodes")
+    nests:list[int] = []
+    for node in nodes.values():
+        if node.facility == "nest":
+            nests.append(node.id)
     for i in range(path_amount):
         node1 = random.randint(0, node_amount-1)
         while len(nodes[node1].connections) >= (path_amount/node_amount)*3:
-            print(nodes[node1])
             node1 = random.randint(0, node_amount-1)
         node2 = random.randint(0, node_amount-1)
         while node1 == node2 or node2 in nodes[node1].connections:
@@ -242,15 +282,12 @@ if __name__ == "__main__":
                 node2 = random.randint(0, node_amount-1)
             node.connections.append(node2)
             nodes[node2].connections.append(node.id)
-            paths.append(Path(origin=node.id,destination=node2))
+            pheromones = initiate_pheromone_dict()
+            paths.append(Path(origin=node.id,destination=node2,pheromones=pheromones))
     print("Initiated paths")
     for i in range(ant_amount):
-        nests:list[int] = []
-        for node in nodes.values():
-            if node.facility == "nest":
-                nests.append(node.id)
-        ants.append(Ant(origin=random.choice(nests)))
-        ants[i].choose_destination()
+        nest = random.choice(nests)
+        ants.append(Ant(origin=nest,goal=nest))
     print("Initiated ants")
     
     pygame.init()
@@ -267,12 +304,14 @@ if __name__ == "__main__":
         for node in nodes.values():
             node.draw(screen)
         for path in paths:
+            path.evaporate_pheromones()
             path.draw(screen)
         for ant in ants:
             ant.step()
             ant.draw(screen)
-        if ants[0].goal is not None: print(ants[0].goal, ants[0].needs[ants[0].goal])
-        
+        if ants[0].goal is not None: print(ants[0].goal, ants[0].get_highest_need(), ants[0].needs)
+        cur_path = get_path(ants[0].origin,ants[0].destination)
+        if cur_path is not None: print(cur_path.pheromones)
         pygame.display.flip()
         clock.tick(FRAMERATE)
         # print(clock.get_fps())
