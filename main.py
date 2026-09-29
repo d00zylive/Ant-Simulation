@@ -18,10 +18,14 @@ FULFILLMENT = 1
 
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
-NODECOLOUR = "red"
+NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
+    None: "black",
+    "grocery store": "green",
+    "house": "red"
+}
 NODERADIUS = 5
 PATHCOLOUR = "blue"
-PATHWIDTH = 3
+PATHWIDTH = 1
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -85,7 +89,7 @@ class Node:
         return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
     
     def draw(self, surface: pygame.Surface):
-        pygame.draw.circle(surface=surface, color=NODECOLOUR,center=(self.x,self.y),radius=NODERADIUS)
+        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=(self.x,self.y),radius=NODERADIUS)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -175,22 +179,33 @@ class Ant:
             path.increase_pheromones(pheromone, drop_amount)
           
 if __name__ == "__main__":
-    node_amount = random.randint(10,15)
-    path_amount = random.randint(30,45)
+    node_amount = random.randint(5,10)
+    path_amount = random.randint(node_amount,(node_amount*(node_amount-1))//4)
     for i in range(node_amount):
-        nodes[i] = Node(id=i,x=random.random()*(WIDTH-2*MARGIN)+MARGIN,y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,facility=random.choices([*PHEROMONES,None],[1 if i < len(PHEROMONES) else 10 for i in range(len(PHEROMONES)+1)])[0],connections=[])
-        print(nodes[i])
+        if i < len(PHEROMONES):
+            facility = PHEROMONES[i]
+        else:
+            facility = random.choices(population=[*PHEROMONES,None],
+                                      weights=[1 if i != len(PHEROMONES) else 20
+                                               for i in range(len(PHEROMONES)+1)])[0]
+        nodes[i] = Node(id=i,
+                        x=random.random()*(WIDTH-2*MARGIN)+MARGIN,
+                        y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,
+                        facility=facility,
+                        connections=[])
     print("Initiated nodes")
     for i in range(path_amount):
         node1 = random.randint(0, node_amount-1)
+        while len(nodes[node1].connections) >= (path_amount/node_amount)*3:
+            print(nodes[node1])
+            node1 = random.randint(0, node_amount-1)
         node2 = random.randint(0, node_amount-1)
-        while node1 != node2 and node2 not in nodes[node1].connections:
+        while node1 == node2 or node2 in nodes[node1].connections:
             node2 = random.randint(0, node_amount-1)
         nodes[node1].connections.append(node2)
         nodes[node2].connections.append(node1)
         paths.append(Path(origin=node1,destination=node2))
-        print(str(paths[i]))
-    print("Initiated connections")
+    print("Initiated paths")
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
     clock = pygame.time.Clock()
