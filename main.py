@@ -271,12 +271,12 @@ def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = Fals
         
     nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
     
-    if not ignore_paths:
+    if not ignore_paths and "paths" not in graph.keys():
         paths:list[Path] = [Path(origin=path["origin"],destination=path["destination"],pheromones={int(key) if key.isdigit() else key:value for key,value in path["pheromones"].items()}) for path in graph["paths"]]
     else:
         paths:list[Path] = []
     
-    if not ignore_ants:
+    if not ignore_ants and "ants" not in graph.keys():
         ants:list[Ant] = [Ant(origin=ant["origin"],destination=ant["destination"],distance=ant["distance"],nest=ant["nest"],needs={int(key) if key.isdigit() else key:value for key,value in ant["needs"].items()},pheromones={int(key) if key.isdigit() else key:value for key,value in ant["pheromones"].items()},goal=ant["goal"]) for ant in graph["ants"]]
     else:
         ants:list[Ant] = []
@@ -344,13 +344,13 @@ if __name__ == "__main__":
                 for connection in node.connections:
                     if connection not in completed_nodes:
                         paths.append(Path(origin=node.id,destination=connection))
+                completed_nodes.append(node.id)
             print("Initiated paths")
         if len(ants) == 0:
             for nest in nests:
                 for _ in range(*ANTSPERNEST):
                     ants.append(Ant(origin=nest))
             print("Initiated ants")
-                
     
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
@@ -379,7 +379,6 @@ if __name__ == "__main__":
         # print(clock.get_fps())
     
     pygame.quit()
-    # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()), paths=paths, ants=ants)
-    
-# TODO: JSON graphs
+    # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
+
 # TODO: Make wanderchance a chance for full random, not a weight for pheromoneless paths
