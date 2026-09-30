@@ -35,6 +35,7 @@ ANTSIZE = 8
 
 GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"graph.json")
+ANTSPERNEST = (10,25)
 
 SIMSPEED = 10
 ANTSPEED = 100*SIMSPEED/FRAMERATE
@@ -302,10 +303,10 @@ if __name__ == "__main__":
                             facility=facility,
                             connections=[])
         print("Initiated nodes")
-        nests:list[int] = []
         for node in nodes.values():
             if node.facility == "nest":
                 nests.append(node.id)
+        print("Collected nests")
         for i in range(path_amount):
             node1 = random.randint(0, node_amount-1)
             while len(nodes[node1].connections) >= (path_amount/node_amount)*3:
@@ -331,7 +332,25 @@ if __name__ == "__main__":
             ants.append(Ant(origin=nest,goal=nest))
         print("Initiated ants")
     else:
-        nodes,paths,ants = load_json(GRAPHFILE)
+        nodes,paths,ants = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
+        print("Loaded json")
+        for node in nodes.values():
+            if node.facility == "nest":
+                nests.append(node.id)
+        print("Collected nests")
+        if len(paths) == 0:
+            completed_nodes: list[int] = []
+            for node in nodes.values():
+                for connection in node.connections:
+                    if connection not in completed_nodes:
+                        paths.append(Path(origin=node.id,destination=connection))
+            print("Initiated paths")
+        if len(ants) == 0:
+            for nest in nests:
+                for _ in range(*ANTSPERNEST):
+                    ants.append(Ant(origin=nest))
+            print("Initiated ants")
+                
     
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
