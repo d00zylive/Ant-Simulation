@@ -1,6 +1,8 @@
 import math
 import random
 import pygame
+import json
+import os
 
 PHEROMONES: list[str] = ["store"]
 
@@ -29,6 +31,10 @@ PATHCOLOURRAMP = 0.01
 PATHWIDTH = 2
 ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
+
+
+GENERATEGRAPH = False
+GRAPHFILE = os.path.join(os.path.dirname(__file__),"graph.json")
 
 SIMSPEED = 10
 ANTSPEED = 100*SIMSPEED/FRAMERATE
@@ -243,54 +249,89 @@ class Ant:
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
         
+def write_json(file_path: str, nodes: list[Node], paths:list[Path]|None = None, ants:list[Ant]|None = None) -> None:
+    dump: dict[str,list[dict]] = {}
+    dump["nodes"] = [{"id":node.id,"x":node.x,"y":node.y,"facility":node.facility,"connections":node.connections} for node in nodes]
+    if paths is not None:
+        dump["paths"] = [{"origin":path.origin,"destination":path.destination,"pheromones":path.pheromones} for path in paths]
+    if ants is not None:
+        dump["ants"] = [{"origin":ant.origin,"destination":ant.destination,"distance":ant.destination,"nest":ant.nest,"needs":ant.needs,"pheromones":ant.pheromones,"goal":ant.goal} for ant in ants]
+    try:
+        with open(file_path, "x") as f:
+            json.dump(dump, f, indent=4)
+    except FileExistsError:
+        if input("File already exists. Are you sure you want to overwrite? (y/N) ") == "y":
+            with open(file_path, "w") as f:
+                json.dump(dump, f, indent=2)
+
+def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant]]:
+    with open(file_path, "r") as f:
+        graph = json.load(f)
+        
+    nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
+    
+    if not ignore_paths:
+        paths:list[Path] = [Path(origin=path["origin"],destination=path["destination"],pheromones={int(key) if key.isdigit() else key:value for key,value in path["pheromones"].items()}) for path in graph["paths"]]
+    else:
+        paths:list[Path] = []
+    
+    if not ignore_ants:
+        ants:list[Ant] = [Ant(origin=ant["origin"],destination=ant["destination"],distance=ant["distance"],nest=ant["nest"],needs={int(key) if key.isdigit() else key:value for key,value in ant["needs"].items()},pheromones={int(key) if key.isdigit() else key:value for key,value in ant["pheromones"].items()},goal=ant["goal"]) for ant in graph["ants"]]
+    else:
+        ants:list[Ant] = []
+        
+    return nodes,paths,ants       
           
 if __name__ == "__main__":
-    node_amount = random.randint(25,50)
-    path_amount = random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
-    ant_amount = random.randint(node_amount,node_amount*4)
-    for i in range(node_amount):
-        if i < len(PHEROMONES):
-            facility = PHEROMONES[i]
-        elif i == len(PHEROMONES):
-            facility = "nest"
-        else:
-            facility = random.choices(population=[*PHEROMONES,"nest",None],
-                                      weights=[1 if i != len(PHEROMONES)+1 else node_amount*0.75
-                                               for i in range(len(PHEROMONES)+2)])[0]
-        nodes[i] = Node(id=i,
-                        x=random.random()*(WIDTH-2*MARGIN)+MARGIN,
-                        y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,
-                        facility=facility,
-                        connections=[])
-    print("Initiated nodes")
-    nests:list[int] = []
-    for node in nodes.values():
-        if node.facility == "nest":
-            nests.append(node.id)
-    for i in range(path_amount):
-        node1 = random.randint(0, node_amount-1)
-        while len(nodes[node1].connections) >= (path_amount/node_amount)*3:
+    if GENERATEGRAPH:
+        node_amount = random.randint(25,50)
+        path_amount = random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
+        ant_amount = random.randint(node_amount*10,node_amount*15)
+        for i in range(node_amount):
+            if i < len(PHEROMONES):
+                facility = PHEROMONES[i]
+            elif i == len(PHEROMONES):
+                facility = "nest"
+            else:
+                facility = random.choices(population=[*PHEROMONES,"nest",None],
+                                        weights=[1 if i != len(PHEROMONES)+1 else node_amount*0.5
+                                                for i in range(len(PHEROMONES)+2)])[0]
+            nodes[i] = Node(id=i,
+                            x=random.random()*(WIDTH-2*MARGIN)+MARGIN,
+                            y=random.random()*(HEIGHT-2*MARGIN)+MARGIN,
+                            facility=facility,
+                            connections=[])
+        print("Initiated nodes")
+        nests:list[int] = []
+        for node in nodes.values():
+            if node.facility == "nest":
+                nests.append(node.id)
+        for i in range(path_amount):
             node1 = random.randint(0, node_amount-1)
-        node2 = random.randint(0, node_amount-1)
-        while node1 == node2 or node2 in nodes[node1].connections:
+            while len(nodes[node1].connections) >= (path_amount/node_amount)*3:
+                node1 = random.randint(0, node_amount-1)
             node2 = random.randint(0, node_amount-1)
-        nodes[node1].connections.append(node2)
-        nodes[node2].connections.append(node1)
-        paths.append(Path(origin=node1,destination=node2))
-    for node in nodes.values():
-        if len(node.connections) == 0:
-            node2 = random.randint(0, node_amount-1)
-            while node.id == node2:
+            while node1 == node2 or node2 in nodes[node1].connections:
                 node2 = random.randint(0, node_amount-1)
-            node.connections.append(node2)
-            nodes[node2].connections.append(node.id)
-            pheromones = initiate_pheromone_dict()
-            paths.append(Path(origin=node.id,destination=node2,pheromones=pheromones))
-    print("Initiated paths")
-    for i in range(ant_amount):
-        nest = random.choice(nests)
-        ants.append(Ant(origin=nest,goal=nest))
-    print("Initiated ants")
+            nodes[node1].connections.append(node2)
+            nodes[node2].connections.append(node1)
+            paths.append(Path(origin=node1,destination=node2))
+        for node in nodes.values():
+            if len(node.connections) == 0:
+                node2 = random.randint(0, node_amount-1)
+                while node.id == node2:
+                    node2 = random.randint(0, node_amount-1)
+                node.connections.append(node2)
+                nodes[node2].connections.append(node.id)
+                pheromones = initiate_pheromone_dict()
+                paths.append(Path(origin=node.id,destination=node2,pheromones=pheromones))
+        print("Initiated paths")
+        for i in range(ant_amount):
+            nest = random.choice(nests)
+            ants.append(Ant(origin=nest,goal=nest))
+        print("Initiated ants")
+    else:
+        nodes,paths,ants = load_json(GRAPHFILE)
     
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
@@ -317,7 +358,9 @@ if __name__ == "__main__":
         pygame.display.flip()
         clock.tick(FRAMERATE)
         # print(clock.get_fps())
-        
+    
     pygame.quit()
+    # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()), paths=paths, ants=ants)
     
 # TODO: JSON graphs
+# TODO: Make wanderchance a chance for full random, not a weight for pheromoneless paths
