@@ -33,16 +33,15 @@ ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
 
 
-GENERATEGRAPH = False
+GENERATEGRAPH = True
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"handmade.json")
 ANTSPERNEST = (20,25)
 
-SIMSPEED = 10
+SIMSPEED = 100
 ANTSPEED = 100*SIMSPEED/FRAMERATE # pixels per second
 WANDERCHANCE = 0.001 # chance for every node to ignore pheromones
 RETAINRATE = 0.99 # factor per pixel
-NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE # need (arbitrary number) gain per second
-FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE # need (arbitrary number) relieved per second
+NEEDGROWTH = 1 # need (arbitrary number) gain per second
 PHEROMONERESET = 1 # the amount of pheromones an ant gets from using a facility 
 EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
 
@@ -168,29 +167,25 @@ class Ant:
         for need in self.needs.keys():
             self.needs[need] += NEEDGROWTH
                 
-        if self.goal is not None and (self.origin == self.goal or nodes[self.origin].facility == self.goal) and self.needs[self.goal] > 0:
-            self.utilise_facility(self.origin)
-            if self.needs[self.goal] <= 0:
-                self.goal = self.get_highest_need()
-        else:
-            self.distance += speed
+        if self.goal is None:
+            self.goal = self.get_highest_need()
+            
+        self.distance += speed
+        path = get_path(self.origin, self.destination)
+        if path is None:
+            self.choose_destination()
             path = get_path(self.origin, self.destination)
-            if path is None:
-                self.choose_destination()
+            assert path is not None
+        while self.distance >= path.get_length():
+            if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
+                self.utilise_facility(self.destination)
+            else:
+                self.distance -= path.get_length()
+                previous_node = self.origin
+                self.origin = self.destination
+                self.choose_destination(previous_node=previous_node)
                 path = get_path(self.origin, self.destination)
                 assert path is not None
-            while self.distance >= path.get_length():
-                if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
-                    self.utilise_facility(self.destination)
-                    self.distance = path.get_length()
-                    break
-                else:
-                    self.distance -= path.get_length()
-                    previous_node = self.origin
-                    self.origin = self.destination
-                    self.choose_destination(previous_node=previous_node)
-                    path = get_path(self.origin, self.destination)
-                    assert path is not None
 
     def choose_destination(self, previous_node:int|None = None, wander_chance:float = WANDERCHANCE):
         if self.goal is not None and self.needs[self.goal] > 0:
@@ -242,11 +237,11 @@ class Ant:
         facility = nodes[node].facility
         assert facility is not None
         if facility != "nest":
-            self.needs[facility] -= FACILITYUSERATE
+            self.needs[facility] = 0
             self.pheromones[facility] = PHEROMONERESET
         else:
             assert node == self.nest
-            self.needs[self.nest] -= FACILITYUSERATE
+            self.needs[self.nest] = 0
             self.pheromones[self.nest] = PHEROMONERESET
 
     def drop_pheromones(self, path: Path, retain_rate:float = RETAINRATE) -> None:
@@ -292,7 +287,7 @@ def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = Fals
 if __name__ == "__main__":
     if GENERATEGRAPH:
         node_amount = random.randint(100,200)
-        path_amount = round(node_amount*0.625)#random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
+        path_amount = random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
         for i in range(node_amount):
             if i < len(PHEROMONES):
                 facility = PHEROMONES[i]
@@ -383,6 +378,6 @@ if __name__ == "__main__":
         # print(clock.get_fps())
     
     pygame.quit()
-    # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
+    if GENERATEGRAPH: write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
 
-# TODO: Make sure using facility doesn't use up movement for high simulation speeds
+# TODO: Make sure using facility doesn't nullify movement for high simulation speeds
