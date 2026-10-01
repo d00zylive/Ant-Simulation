@@ -38,13 +38,13 @@ GRAPHFILE = os.path.join(os.path.dirname(__file__),"handmade.json")
 ANTSPERNEST = (20,25)
 
 SIMSPEED = 10
-ANTSPEED = 100*SIMSPEED/FRAMERATE
-WANDERCHANCE = 0.001
-DROPRATE = 0.5
-NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE
-FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE
-PHEROMONERESET = 1
-EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE)
+ANTSPEED = 100*SIMSPEED/FRAMERATE # pixels per second
+WANDERCHANCE = 0.001 # chance for every node to ignore pheromones
+RETAINRATE = 0.99 # factor per pixel
+NEEDGROWTH = 0.05*SIMSPEED/FRAMERATE # need (arbitrary number) gain per second
+FACILITYUSERATE = 0.5*SIMSPEED/FRAMERATE # need (arbitrary number) relieved per second
+PHEROMONERESET = 1 # the amount of pheromones an ant gets from using a facility 
+EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -249,10 +249,10 @@ class Ant:
             self.needs[self.nest] -= FACILITYUSERATE
             self.pheromones[self.nest] = PHEROMONERESET
 
-    def drop_pheromones(self, path: Path, drop_rate:float = DROPRATE) -> None:
+    def drop_pheromones(self, path: Path, retain_rate:float = RETAINRATE) -> None:
         assert path is not None
         for pheromone in self.pheromones.keys():
-            drop_amount = self.pheromones[pheromone]*drop_rate
+            drop_amount = self.pheromones[pheromone]*(1-retain_rate**path.get_length())
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
         
@@ -291,9 +291,8 @@ def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = Fals
           
 if __name__ == "__main__":
     if GENERATEGRAPH:
-        node_amount = random.randint(25,50)
-        path_amount = random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
-        ant_amount = random.randint(node_amount*10,node_amount*15)
+        node_amount = random.randint(100,200)
+        path_amount = round(node_amount*0.625)#random.randint(node_amount,max(min(round(node_amount*1.5),(node_amount*(node_amount-1))//2),node_amount))
         for i in range(node_amount):
             if i < len(PHEROMONES):
                 facility = PHEROMONES[i]
@@ -333,9 +332,9 @@ if __name__ == "__main__":
                 pheromones = initiate_pheromone_dict()
                 paths.append(Path(origin=node.id,destination=node2,pheromones=pheromones))
         print("Initiated paths")
-        for i in range(ant_amount):
-            nest = random.choice(nests)
-            ants.append(Ant(origin=nest,goal=nest))
+        for nest in nests:
+            for _ in range(random.randint(*ANTSPERNEST)):
+                ants.append(Ant(origin=nest))
         print("Initiated ants")
     else:
         nodes,paths,ants = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
@@ -386,4 +385,4 @@ if __name__ == "__main__":
     pygame.quit()
     # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
 
-# TODO: Make the amounts of pheromones dropped depend on the length of the path
+# TODO: Make sure using facility doesn't use up movement for high simulation speeds
