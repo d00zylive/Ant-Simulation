@@ -17,7 +17,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
         pheromones[nest] = value
     return pheromones
 
-FRAMERATE = 10
+FRAMERATE = 60
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
@@ -34,8 +34,8 @@ ANTSIZE = 8
 
 
 GENERATEGRAPH = False
-GRAPHFILE = os.path.join(os.path.dirname(__file__),"graph.json")
-ANTSPERNEST = (10,25)
+GRAPHFILE = os.path.join(os.path.dirname(__file__),"handmade.json")
+ANTSPERNEST = (20,25)
 
 SIMSPEED = 10
 ANTSPEED = 100*SIMSPEED/FRAMERATE
@@ -201,21 +201,27 @@ class Ant:
         assert need is not None
         connected_paths = [get_path(self.origin, connection) for connection in nodes[self.origin].connections]
         assert all([path is not None for path in connected_paths])
-        path_weights: list[float] = []
-        for path in connected_paths:
-            if path is not None:
-                if previous_node is not None and (previous_node == path.origin or previous_node == path.destination):
-                    modifier = 0.1
+        if random.random() >= WANDERCHANCE:
+            path_weights: list[float] = []
+            for path in connected_paths:
+                if path is not None:
+                    if previous_node is not None and (previous_node == path.origin or previous_node == path.destination):
+                        modifier = 0.1
+                    else:
+                        modifier = 1
+                    pheromone_amount = path.pheromones[need]
+                    if pheromone_amount != 0:
+                        path_weights.append(pheromone_amount*modifier)
+                    else:
+                        path_weights.append(0)
                 else:
-                    modifier = 1
-                pheromone_amount = path.pheromones[need]
-                if pheromone_amount != 0:
-                    path_weights.append(pheromone_amount*modifier)
-                else:
-                    path_weights.append(wander_chance*modifier)
+                    path_weights.append(0)
+            if sum(path_weights) > 0:
+                chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
             else:
-                path_weights.append(0)
-        chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
+                chosen_path: Path|None = random.choice(connected_paths)
+        else:
+            chosen_path: Path|None = random.choice(connected_paths)
         assert chosen_path is not None
         self.drop_pheromones(chosen_path)
         if chosen_path.origin == self.origin:
@@ -348,10 +354,9 @@ if __name__ == "__main__":
             print("Initiated paths")
         if len(ants) == 0:
             for nest in nests:
-                for _ in range(*ANTSPERNEST):
+                for _ in range(random.randint(*ANTSPERNEST)):
                     ants.append(Ant(origin=nest))
             print("Initiated ants")
-    
     pygame.init()
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
     clock = pygame.time.Clock()
@@ -371,9 +376,9 @@ if __name__ == "__main__":
         for ant in ants:
             ant.step()
             ant.draw(screen)
-        if ants[0].goal is not None: print(ants[0].pheromones)
-        cur_path = get_path(ants[0].origin,ants[0].destination)
-        if cur_path is not None: print(cur_path.pheromones)
+        # if ants[0].goal is not None: print(ants[0].pheromones)
+        # cur_path = get_path(ants[0].origin,ants[0].destination)
+        # if cur_path is not None: print(cur_path.pheromones)
         pygame.display.flip()
         clock.tick(FRAMERATE)
         # print(clock.get_fps())
@@ -381,4 +386,4 @@ if __name__ == "__main__":
     pygame.quit()
     # write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
 
-# TODO: Make wanderchance a chance for full random, not a weight for pheromoneless paths
+# TODO: Make the amounts of pheromones dropped depend on the length of the path
