@@ -33,8 +33,8 @@ ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
 
 
-GENERATEGRAPH = True
-GRAPHFILE = os.path.join(os.path.dirname(__file__),"handmade.json")
+GENERATEGRAPH = False
+GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
 ANTSPERNEST = (20,25)
 
 SIMSPEED = 100
@@ -66,12 +66,12 @@ class Path:
     def __str__(self):
         return f"Path(origin={nodes[self.origin]},destination={nodes[self.destination]},pheromones={self.pheromones})"
         
-    def draw(self, surface: pygame.Surface) -> None:
+    def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
         ramp = lambda x: min(x*100,255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
         nest_pheromone_sum = round(ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys())))
-        pygame.draw.line(surface, color=(nest_pheromone_sum,round(ramp(self.pheromones["store"])),0), start_pos=(round(start.x),round(start.y)), end_pos=(round(end.x),round(end.y)), width=PATHWIDTH)
+        pygame.draw.line(surface, color=(nest_pheromone_sum,round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,(end.y-origin[1])*scale), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -266,9 +266,12 @@ def write_json(file_path: str, nodes: list[Node], paths:list[Path]|None = None, 
             with open(file_path, "w") as f:
                 json.dump(dump, f, indent=2)
 
-def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant]]:
+def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant],tuple[float,float,float,float]]:
     with open(file_path, "r") as f:
         graph = json.load(f)
+        
+    if "bounds" in graph.keys():
+        bounds: tuple[float,float,float,float] = tuple([graph["bounds"][key] for key in ["minlat","minlon","maxlat","maxlon"]])
         
     nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
     
@@ -282,7 +285,7 @@ def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = Fals
     else:
         ants:list[Ant] = []
         
-    return nodes,paths,ants       
+    return nodes,paths,ants,bounds
           
 if __name__ == "__main__":
     if GENERATEGRAPH:
@@ -332,7 +335,7 @@ if __name__ == "__main__":
                 ants.append(Ant(origin=nest))
         print("Initiated ants")
     else:
-        nodes,paths,ants = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
+        nodes,paths,ants,bounds = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
         print("Loaded json")
         for node in nodes.values():
             if node.facility == "nest":
@@ -355,6 +358,7 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode((WIDTH,HEIGHT))
     clock = pygame.time.Clock()
     running = True
+    print(bounds)
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -366,7 +370,7 @@ if __name__ == "__main__":
             node.draw(screen)
         for path in paths:
             path.evaporate_pheromones()
-            path.draw(screen)
+            path.draw(screen, bounds=bounds)
         for ant in ants:
             ant.step()
             ant.draw(screen)
@@ -378,6 +382,5 @@ if __name__ == "__main__":
         # print(clock.get_fps())
     
     pygame.quit()
-    if GENERATEGRAPH: write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
-
-# TODO: Make sure using facility doesn't nullify movement for high simulation speeds
+    if GENERATEGRAPH:
+        write_json(os.path.join(os.path.dirname(__file__), GRAPHFILE), nodes=list(nodes.values()))#, paths=paths, ants=ants)
