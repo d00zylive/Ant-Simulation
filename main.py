@@ -111,7 +111,8 @@ class Node:
     
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         radius = NODERADIUS if self.facility is None else FACILITYRADIUS
-        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=((self.x-origin[0])*scale,(self.y-origin[1])*scale),radius=radius)
+        if self.facility is not None:
+            pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=((self.x-origin[0])*scale,(self.y-origin[1])*scale),radius=radius)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
