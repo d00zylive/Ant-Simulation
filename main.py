@@ -18,7 +18,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
     return pheromones
 
 FRAMERATE = 60
-WIDTH,HEIGHT = 1280,720
+WIDTH,HEIGHT = 1920,1080
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
     None: (0,0,0),
@@ -37,10 +37,10 @@ GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
 ANTSPERNEST = (20,25)
 
-SIMSPEED = 1
+SIMSPEED = 100
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
 WANDERCHANCE = 0.001 # chance for every node to ignore pheromones
-RETAINRATE = 0.5 # factor per meter
+RETAINRATE = 0.99 # factor per meter (only accurate around the equator)
 NEEDGROWTH = 1 # need (arbitrary number) gain per second
 PHEROMONERESET = 1 # the amount of pheromones an ant gets from using a facility 
 EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
@@ -179,7 +179,6 @@ class Ant:
             self.choose_destination()
             path = get_path(self.origin, self.destination)
             assert path is not None
-            print(self.distance/path.get_length())
         while self.distance >= path.get_length():
             if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
                 self.utilise_facility(self.destination)
@@ -251,7 +250,7 @@ class Ant:
     def drop_pheromones(self, path: Path, retain_rate:float = RETAINRATE) -> None:
         assert path is not None
         for pheromone in self.pheromones.keys():
-            drop_amount = self.pheromones[pheromone]*(1-retain_rate**path.get_length())
+            drop_amount = self.pheromones[pheromone]*(1-retain_rate**((path.get_length()*40075017)/360))
             self.pheromones[pheromone] -= drop_amount
             path.increase_pheromones(pheromone, drop_amount)
         
@@ -363,14 +362,14 @@ if __name__ == "__main__":
         origin = (0,0)
         scale = 1
     else:
-        origin = (bounds[1],bounds[0])
         bounds_ratio = (bounds[3]-bounds[1])/(bounds[2]-bounds[0])
         if bounds_ratio > WIDTH/HEIGHT:
             screen = pygame.display.set_mode((WIDTH,WIDTH/bounds_ratio))
-            scale = (WIDTH-MARGIN)/(bounds[3]-bounds[1])
+            scale = (WIDTH-MARGIN*2)/(bounds[3]-bounds[1])
         else:
             screen = pygame.display.set_mode((HEIGHT*bounds_ratio,HEIGHT))
-            scale = (HEIGHT-MARGIN)/(bounds[2]-bounds[0])
+            scale = (HEIGHT-MARGIN*2)/(bounds[2]-bounds[0])
+        origin = (bounds[1]+(MARGIN/scale),bounds[0]+(MARGIN/scale))
     clock = pygame.time.Clock()
     running = True
     while running:
@@ -387,12 +386,8 @@ if __name__ == "__main__":
         for ant in ants:
             ant.step()
             ant.draw(screen, origin=origin, scale=scale)
-        # if ants[0].goal is not None: print(ants[0].pheromones)
-        # cur_path = get_path(ants[0].origin,ants[0].destination)
-        # if cur_path is not None: print(cur_path.pheromones)
         pygame.display.flip()
         clock.tick(FRAMERATE)
-        # print(clock.get_fps())
     
     pygame.quit()
     if GENERATEGRAPH:
