@@ -266,13 +266,12 @@ def write_json(file_path: str, nodes: list[Node], paths:list[Path]|None = None, 
             with open(file_path, "w") as f:
                 json.dump(dump, f, indent=2)
 
-def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant],tuple[float,float,float,float]]:
+def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant],tuple[float,float,float,float]|None]:
     with open(file_path, "r") as f:
         graph = json.load(f)
         
-    if "bounds" in graph.keys():
-        bounds: tuple[float,float,float,float] = tuple([graph["bounds"][key] for key in ["minlat","minlon","maxlat","maxlon"]])
-        
+    bounds: tuple[float,float,float,float]|None = tuple([graph["bounds"][key] for key in ["minlat","minlon","maxlat","maxlon"]]) if "bounds" in graph.keys() else None
+    
     nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
     
     if not ignore_paths and "paths" not in graph.keys():
@@ -355,7 +354,19 @@ if __name__ == "__main__":
                     ants.append(Ant(origin=nest))
             print("Initiated ants")
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH,HEIGHT))
+    if bounds is None or GENERATEGRAPH:
+        screen = pygame.display.set_mode((WIDTH,HEIGHT))
+        origin = (0,0)
+        scale = 1
+    else:
+        origin = (bounds[1],bounds[0])
+        bounds_ratio = (bounds[3]-bounds[1])/(bounds[2]-bounds[0])
+        if bounds_ratio > WIDTH/HEIGHT:
+            screen = pygame.display.set_mode((WIDTH,WIDTH/bounds_ratio))
+            scale = (WIDTH-MARGIN)/(bounds[3]-bounds[1])
+        else:
+            screen = pygame.display.set_mode((HEIGHT*bounds_ratio,HEIGHT))
+            scale = (HEIGHT-MARGIN)/(bounds[2]-bounds[0])
     clock = pygame.time.Clock()
     running = True
     print(bounds)
@@ -370,7 +381,7 @@ if __name__ == "__main__":
             node.draw(screen)
         for path in paths:
             path.evaporate_pheromones()
-            path.draw(screen, bounds=bounds)
+            path.draw(screen, origin=origin, scale=scale)
         for ant in ants:
             ant.step()
             ant.draw(screen)
