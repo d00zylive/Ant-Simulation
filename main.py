@@ -35,15 +35,16 @@ ANTSIZE = 8
 
 GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
-ANTSPERNEST = (20,25)
+ANTSPERNEST = (90,110)
 
 SIMSPEED = 100
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
-WANDERCHANCE = 0.001 # chance for every node to ignore pheromones
-RETAINRATE = 0.99 # factor per meter (only accurate around the equator)
+WANDERCHANCE = 0.0001 # chance for every node to ignore pheromones
+REVERSEMODIFIER = 0
+RETAINRATE = 0.995 # factor per meter (only accurate around the equator)
 NEEDGROWTH = 1 # need (arbitrary number) gain per second
-PHEROMONERESET = 1 # the amount of pheromones an ant gets from using a facility 
-EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
+PHEROMONERESET = 5 # the amount of pheromones an ant gets from using a facility 
+EVAPORATIONRATE = 0.995**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
 
 nodes: dict[int, Node] = {}
 paths: list[Path] = []
@@ -69,9 +70,9 @@ class Path:
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
-        ramp = lambda x: min(x*100,255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
-        nest_pheromone_sum = round(ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys())))
-        pygame.draw.line(surface, color=(nest_pheromone_sum,round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,(end.y-origin[1])*scale), width=PATHWIDTH)
+        ramp = lambda x: min(x/(self.get_length()*10),255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
+        nest_pheromone_sum = ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
+        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,(end.y-origin[1])*scale), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -141,6 +142,7 @@ class Ant:
         self.nest = nest if nest is not None else origin
         self.needs = needs if needs is not None else initiate_pheromone_dict(value=1, nest=self.nest)
         self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict(nest=self.nest)
+        self.pheromones[self.nest] = PHEROMONERESET
         self.goal = goal
         
     def __repr__(self):
@@ -204,13 +206,9 @@ class Ant:
             path_weights: list[float] = []
             for path in connected_paths:
                 if path is not None:
-                    if previous_node is not None and (previous_node == path.origin or previous_node == path.destination):
-                        modifier = 0.1
-                    else:
-                        modifier = 1
-                    pheromone_amount = path.pheromones[need]
-                    if pheromone_amount != 0:
-                        path_weights.append(pheromone_amount*modifier)
+                    pheromone_amount = path.pheromones[need]/path.get_length()
+                    if pheromone_amount != 0 and (previous_node is None or (previous_node != path.origin and previous_node != path.destination)):
+                        path_weights.append(pheromone_amount)
                     else:
                         path_weights.append(0)
                 else:
@@ -218,6 +216,10 @@ class Ant:
             if sum(path_weights) > 0:
                 chosen_path: Path|None = random.choices(connected_paths, weights=path_weights)[0]
             else:
+                if len(connected_paths) > 1 and previous_node is not None:
+                    previous_path = get_path(self.origin, previous_node)
+                    assert previous_path is not None
+                    connected_paths.remove(previous_path)
                 chosen_path: Path|None = random.choice(connected_paths)
         else:
             chosen_path: Path|None = random.choice(connected_paths)
