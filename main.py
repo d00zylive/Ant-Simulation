@@ -17,7 +17,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
         pheromones[nest] = value
     return pheromones
 
-FRAMERATE = 60
+FRAMERATE = 1
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
@@ -109,9 +109,9 @@ class Node:
     def __repr__(self):
         return f"Node(id={self.id},x={self.x},y={self.y},facility={self.facility},connections={self.connections})"
     
-    def draw(self, surface: pygame.Surface):
+    def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         radius = NODERADIUS if self.facility is None else FACILITYRADIUS
-        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=(self.x,self.y),radius=radius)
+        pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=((self.x-origin[0])*scale,(self.y-origin[1])*scale),radius=radius)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -141,6 +141,9 @@ class Ant:
         self.needs = needs if needs is not None else initiate_pheromone_dict(value=1, nest=self.nest)
         self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict(nest=self.nest)
         self.goal = goal
+        
+    def __repr__(self):
+        return f"Ant(origin={self.origin},destination={self.destination},distance={self.distance},nest={self.nest},needs={self.needs},pheromones={self.pheromones},goal={self.goal})"
     
     def get_pos(self) -> tuple[float,float]:
         if self.origin != self.destination:
@@ -159,9 +162,9 @@ class Ant:
             x,y = origin.x, origin.y
         return (x,y)
     
-    def draw(self, surface: pygame.Surface):
+    def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         x,y = self.get_pos()
-        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect((x-ANTSIZE/2),(y-ANTSIZE/2),ANTSIZE,ANTSIZE))
+        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect(((x-origin[0])*scale-ANTSIZE/2),((y-origin[1])*scale-ANTSIZE/2),ANTSIZE,ANTSIZE))
 
     def step(self, speed:float = ANTSPEED) -> None:
         for need in self.needs.keys():
@@ -369,22 +372,26 @@ if __name__ == "__main__":
             scale = (HEIGHT-MARGIN)/(bounds[2]-bounds[0])
     clock = pygame.time.Clock()
     running = True
-    print(bounds)
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        
         screen.fill((255,255,255))
-        
+        print(0)
         for node in nodes.values():
-            node.draw(screen)
+            node.draw(screen, origin=origin, scale=scale)
+        print(1)
         for path in paths:
             path.evaporate_pheromones()
             path.draw(screen, origin=origin, scale=scale)
+        print(2)
         for ant in ants:
+            print(ant)
             ant.step()
-            ant.draw(screen)
+            print(2.1)
+            ant.draw(screen, origin=origin, scale=scale)
+            print(2.2)
+        print(3)
         # if ants[0].goal is not None: print(ants[0].pheromones)
         # cur_path = get_path(ants[0].origin,ants[0].destination)
         # if cur_path is not None: print(cur_path.pheromones)
