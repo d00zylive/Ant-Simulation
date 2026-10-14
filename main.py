@@ -17,7 +17,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
         pheromones[nest] = value
     return pheromones
 
-FRAMERATE = 1
+FRAMERATE = 60
 WIDTH,HEIGHT = 1280,720
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
@@ -37,10 +37,10 @@ GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
 ANTSPERNEST = (20,25)
 
-SIMSPEED = 100
-ANTSPEED = 100*SIMSPEED/FRAMERATE # pixels per second
+SIMSPEED = 1
+ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
 WANDERCHANCE = 0.001 # chance for every node to ignore pheromones
-RETAINRATE = 0.99 # factor per pixel
+RETAINRATE = 0.5 # factor per meter
 NEEDGROWTH = 1 # need (arbitrary number) gain per second
 PHEROMONERESET = 1 # the amount of pheromones an ant gets from using a facility 
 EVAPORATIONRATE = 0.97**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
@@ -179,6 +179,7 @@ class Ant:
             self.choose_destination()
             path = get_path(self.origin, self.destination)
             assert path is not None
+            print(self.distance/path.get_length())
         while self.distance >= path.get_length():
             if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
                 self.utilise_facility(self.destination)
@@ -377,21 +378,15 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 running = False
         screen.fill((255,255,255))
-        print(0)
+        
         for node in nodes.values():
             node.draw(screen, origin=origin, scale=scale)
-        print(1)
         for path in paths:
             path.evaporate_pheromones()
             path.draw(screen, origin=origin, scale=scale)
-        print(2)
         for ant in ants:
-            print(ant)
             ant.step()
-            print(2.1)
             ant.draw(screen, origin=origin, scale=scale)
-            print(2.2)
-        print(3)
         # if ants[0].goal is not None: print(ants[0].pheromones)
         # cur_path = get_path(ants[0].origin,ants[0].destination)
         # if cur_path is not None: print(cur_path.pheromones)
