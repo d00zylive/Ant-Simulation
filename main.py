@@ -72,7 +72,7 @@ class Path:
         end = nodes[self.destination]
         ramp = lambda x: min(x/(self.get_length()*10),255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
         nest_pheromone_sum = ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
-        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,(end.y-origin[1])*scale), width=PATHWIDTH)
+        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,surface.get_height()-(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,surface.get_height()-(end.y-origin[1])*scale), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -113,7 +113,7 @@ class Node:
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         radius = NODERADIUS if self.facility is None else FACILITYRADIUS
         if self.facility is not None:
-            pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=((self.x-origin[0])*scale,(self.y-origin[1])*scale),radius=radius)
+            pygame.draw.circle(surface=surface, color=NODECOLOURS[self.facility],center=((self.x-origin[0])*scale,surface.get_height()-(self.y-origin[1])*scale),radius=radius)
     
     def get_paths(self) -> list[Path]:
         path_objects: list[Path] = []
@@ -167,7 +167,7 @@ class Ant:
     
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         x,y = self.get_pos()
-        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect(((x-origin[0])*scale-ANTSIZE/2),((y-origin[1])*scale-ANTSIZE/2),ANTSIZE,ANTSIZE))
+        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect(((x-origin[0])*scale-ANTSIZE/2),surface.get_height()-((y-origin[1])*scale+ANTSIZE/2),ANTSIZE,ANTSIZE))
 
     def step(self, speed:float = ANTSPEED) -> None:
         for need in self.needs.keys():
