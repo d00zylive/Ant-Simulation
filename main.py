@@ -18,7 +18,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
     return pheromones
 
 FRAMERATE = 60
-WIDTH,HEIGHT = 1920,1080
+WIDTH,HEIGHT = 1920,900
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
     None: (0,0,0),
@@ -39,7 +39,7 @@ ANTSPERNEST = (90,110)
 
 SIMSPEED = 100
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
-WANDERCHANCE = 0.0001 # chance for every node to ignore pheromones
+WANDERCHANCE = 0.0005 # chance for every node to ignore pheromones
 REVERSEMODIFIER = 0
 RETAINRATE = 0.995 # factor per meter (only accurate around the equator)
 NEEDGROWTH = 1 # need (arbitrary number) gain per second
@@ -187,7 +187,7 @@ class Ant:
                 self.utilise_facility(self.destination)
             else:
                 self.distance -= path.get_length()
-                previous_node = self.origin
+                previous_node = self.origin if self.goal != nodes[self.destination].facility and self.goal != self.destination else None
                 self.origin = self.destination
                 self.choose_destination(previous_node=previous_node)
                 path = get_path(self.origin, self.destination)
