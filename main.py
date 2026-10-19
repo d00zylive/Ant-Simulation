@@ -27,7 +27,7 @@ NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
 }
 FACILITYRADIUS = 7
 NODERADIUS = 2
-PATHCOLOURRAMP = 0.01
+path_colour_ramp = 1
 PATHWIDTH = 2
 ANTCOLOUR = (0,0,255)
 ANTSIZE = 8
@@ -70,7 +70,7 @@ class Path:
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
-        ramp = lambda x: round(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
+        ramp = lambda x: round(255-(1/(path_colour_ramp*(x+1/(path_colour_ramp*255))))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
         nest_pheromone_sum = ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
         pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,surface.get_height()-(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,surface.get_height()-(end.y-origin[1])*scale), width=PATHWIDTH)
 
@@ -379,6 +379,13 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    path_colour_ramp*=1.1
+                    print(path_colour_ramp)
+                elif event.key == pygame.K_DOWN:
+                    path_colour_ramp*=(10/11)
+                    print(path_colour_ramp)
         screen.fill((255,255,255))
         
         for node in nodes.values():
