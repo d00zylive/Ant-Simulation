@@ -39,7 +39,7 @@ ANTSPERNEST = (90,110)
 
 SIMSPEED = 100
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
-WANDERCHANCE = 0.0005 # chance for every node to ignore pheromones
+WANDERCHANCE = 0.005 # chance for every node to ignore pheromones
 REVERSEMODIFIER = 0
 RETAINRATE = 0.995 # factor per meter (only accurate around the equator)
 NEEDGROWTH = 1 # need (arbitrary number) gain per second
@@ -70,7 +70,7 @@ class Path:
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
         start = nodes[self.origin]
         end = nodes[self.destination]
-        ramp = lambda x: min(x/(self.get_length()*10),255)#(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0
+        ramp = lambda x: round(255-(1/(PATHCOLOURRAMP*x+1/255))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
         nest_pheromone_sum = ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
         pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,surface.get_height()-(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,surface.get_height()-(end.y-origin[1])*scale), width=PATHWIDTH)
 
@@ -167,7 +167,7 @@ class Ant:
     
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1):
         x,y = self.get_pos()
-        pygame.draw.rect(surface,color=ANTCOLOUR,rect=pygame.Rect(((x-origin[0])*scale-ANTSIZE/2),surface.get_height()-((y-origin[1])*scale+ANTSIZE/2),ANTSIZE,ANTSIZE))
+        pygame.draw.rect(surface,color=(255 if isinstance(self.goal,int) else 0, 255 if self.goal=="store" else 0, 255),rect=pygame.Rect(((x-origin[0])*scale-ANTSIZE/2),surface.get_height()-((y-origin[1])*scale+ANTSIZE/2),ANTSIZE,ANTSIZE))
 
     def step(self, speed:float = ANTSPEED) -> None:
         for need in self.needs.keys():
