@@ -47,7 +47,7 @@ PHEROMONERESET = 5 # the amount of pheromones an ant gets from using a facility
 EVAPORATIONRATE = 0.995**(1*SIMSPEED/FRAMERATE) # the factor of pheromones that evaporate every second
 
 nodes: dict[int, Node] = {}
-paths: list[Path] = []
+paths: dict[tuple[int,int],Path] = {}
 ants: list[Ant] = []
 nests: list[int] = []
 
@@ -101,9 +101,13 @@ class Path:
         return math.sqrt((origin_node[0]-destination_node[0])**2+(origin_node[1]-destination_node[1])**2)
 
 def get_path(node1: int, node2: int) -> Path|None:
-    for path in paths:
-        if path.origin == node1 and path.destination == node2 or path.destination == node1 and path.origin == node2:
-            return path
+    if (node1,node2) in paths.keys():
+        return paths[(node1,node2)]
+    elif (node2,node1) in paths.keys():
+        return paths[(node2,node1)]
+    else:
+        print("Warning: path between {node1} and {node2} doesn't exist, returning None")
+        return None
 
 class Node:
     id: int
@@ -134,7 +138,7 @@ class Node:
             if path is None:
                 print(f"WARNING: no path between {self} and {nodes[connection]}. Creating new entry.")
                 path = Path(origin=self.id, destination=connection, pheromones=initiate_pheromone_dict())
-                paths.append(path)
+                paths[(self.id,connection)] = path
             path_objects.append(path)
         return path_objects
 
@@ -284,7 +288,7 @@ def write_json(file_path: str, nodes: list[Node], paths:list[Path]|None = None, 
             with open(file_path, "w") as f:
                 json.dump(dump, f, indent=2)
 
-def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],list[Path],list[Ant],tuple[float,float,float,float]|None]:
+def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],dict[tuple[int,int],Path],list[Ant],tuple[float,float,float,float]|None]:
     with open(file_path, "r") as f:
         graph = json.load(f)
         
@@ -293,9 +297,9 @@ def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = Fals
     nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
     
     if not ignore_paths and "paths" not in graph.keys():
-        paths:list[Path] = [Path(origin=path["origin"],destination=path["destination"],pheromones={int(key) if key.isdigit() else key:value for key,value in path["pheromones"].items()}) for path in graph["paths"]]
+        paths:dict[tuple[int,int],Path] = {(path["origin"],path["destination"]):Path(origin=path["origin"],destination=path["destination"],pheromones={int(key) if key.isdigit() else key:value for key,value in path["pheromones"].items()}) for path in graph["paths"]}
     else:
-        paths:list[Path] = []
+        paths:dict[tuple[int,int],Path] = {}
     
     if not ignore_ants and "ants" not in graph.keys():
         ants:list[Ant] = [Ant(origin=ant["origin"],destination=ant["destination"],distance=ant["distance"],nest=ant["nest"],needs={int(key) if key.isdigit() else key:value for key,value in ant["needs"].items()},pheromones={int(key) if key.isdigit() else key:value for key,value in ant["pheromones"].items()},goal=ant["goal"]) for ant in graph["ants"]]
@@ -336,7 +340,7 @@ if __name__ == "__main__":
                 node2 = random.randint(0, node_amount-1)
             nodes[node1].connections.append(node2)
             nodes[node2].connections.append(node1)
-            paths.append(Path(origin=node1,destination=node2))
+            paths[(node1,node2)] = Path(origin=node1,destination=node2)
         for node in nodes.values():
             if len(node.connections) == 0:
                 node2 = random.randint(0, node_amount-1)
@@ -345,7 +349,7 @@ if __name__ == "__main__":
                 node.connections.append(node2)
                 nodes[node2].connections.append(node.id)
                 pheromones = initiate_pheromone_dict()
-                paths.append(Path(origin=node.id,destination=node2,pheromones=pheromones))
+                paths[(node.id,node2)] = Path(origin=node.id,destination=node2,pheromones=pheromones)
         print("Initiated paths")
         for nest in nests:
             for _ in range(random.randint(*ANTSPERNEST)):
@@ -363,7 +367,7 @@ if __name__ == "__main__":
             for node in nodes.values():
                 for connection in node.connections:
                     if connection not in completed_nodes:
-                        paths.append(Path(origin=node.id,destination=connection))
+                        paths[(node.id,connection)] = Path(origin=node.id,destination=connection)
                 completed_nodes.append(node.id)
             print("Initiated paths")
         if len(ants) == 0:
@@ -403,7 +407,7 @@ if __name__ == "__main__":
         
         for node in nodes.values():
             node.draw(screen, origin=origin, scale=scale)
-        for path in paths:
+        for path in paths.values():
             path.evaporate_pheromones()
             path.draw(screen, origin=origin, scale=scale)
         for ant in ants:
