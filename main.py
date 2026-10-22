@@ -173,9 +173,7 @@ class Ant:
         if self.origin != self.destination:
             origin = nodes[self.origin]
             destination = nodes[self.destination]
-            path = get_path(self.origin,self.destination)
-            assert path is not None
-            fraction_traveled = self.distance/path.get_length()
+            fraction_traveled = self.distance/math.sqrt((origin.x-destination.x)**2+(origin.y-destination.y)**2)
             if fraction_traveled <= 1:
                 x = origin.x+fraction_traveled*(destination.x-origin.x)
                 y = origin.y+fraction_traveled*(destination.y-origin.y)
