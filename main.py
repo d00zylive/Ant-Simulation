@@ -35,9 +35,9 @@ ANTSIZE = 8
 
 GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
-ANTSPERNEST = (90,110)
+ANTSPERNEST = (0,5)
 
-SIMSPEED = 100
+SIMSPEED = 1
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
 WANDERCHANCE = 0.005 # chance for every node to ignore pheromones
 REVERSEMODIFIER = 0
@@ -55,24 +55,36 @@ class Path:
     origin: int
     destination: int
     pheromones: dict[str|int,float]
+    origin_pos: tuple[float,float]|None
+    destination_pos: tuple[float,float]|None
     
     def __init__(self, origin: int, destination: int, pheromones:dict[str|int,float]|None = None):
         self.origin = origin
         self.destination = destination
         self.pheromones = pheromones if pheromones is not None else initiate_pheromone_dict()
+        self.origin_pos = None
+        self.destination_pos = None
         
     def __repr__(self):
         return f"Path(origin={self.origin},destination={self.destination},pheromones={self.pheromones})"
     
     def __str__(self):
         return f"Path(origin={nodes[self.origin]},destination={nodes[self.destination]},pheromones={self.pheromones})"
+     
+    def fetch_origin(self) -> tuple[float,float]:
+        self.origin_pos = (nodes[self.origin].x, nodes[self.origin].y)
+        return self.origin_pos
+    
+    def fetch_destination(self) -> tuple[float,float]:
+        self.destination_pos = nodes[self.destination].x, nodes[self.destination].y
+        return self.destination_pos
         
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
-        start = nodes[self.origin]
-        end = nodes[self.destination]
+        start = self.origin_pos if self.origin_pos is not None else self.fetch_origin()
+        end = self.destination_pos if self.destination_pos is not None else self.fetch_destination()
         ramp = lambda x: round(255-(1/(path_colour_ramp*(x+1/(path_colour_ramp*255))))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
-        nest_pheromone_sum = ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
-        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start.x-origin[0])*scale,surface.get_height()-(start.y-origin[1])*scale), end_pos=((end.x-origin[0])*scale,surface.get_height()-(end.y-origin[1])*scale), width=PATHWIDTH)
+        nest_pheromone_sum = 0#ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
+        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start[0]-origin[0])*scale,surface.get_height()-(start[1]-origin[1])*scale), end_pos=((end[0]-origin[0])*scale,surface.get_height()-(end[1]-origin[1])*scale), width=PATHWIDTH)
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
         if not type in self.pheromones.keys():
@@ -85,8 +97,8 @@ class Path:
             self.pheromones[key] *= rate
             
     def get_length(self) -> float:
-        origin_node, destination_node = nodes[self.origin], nodes[self.destination]
-        return math.sqrt((origin_node.x-destination_node.x)**2+(origin_node.y-destination_node.y)**2)
+        origin_node, destination_node = self.origin_pos if self.origin_pos is not None else self.fetch_origin(), self.destination_pos if self.destination_pos is not None else self.fetch_destination()
+        return math.sqrt((origin_node[0]-destination_node[0])**2+(origin_node[1]-destination_node[1])**2)
 
 def get_path(node1: int, node2: int) -> Path|None:
     for path in paths:
@@ -375,7 +387,8 @@ if __name__ == "__main__":
         origin = (bounds[1]+(MARGIN/scale),bounds[0]+(MARGIN/scale))
     clock = pygame.time.Clock()
     running = True
-    while running:
+    frames = 0
+    while running and frames < 100:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -398,6 +411,8 @@ if __name__ == "__main__":
             ant.draw(screen, origin=origin, scale=scale)
         pygame.display.flip()
         clock.tick(FRAMERATE)
+        print(clock.get_fps())
+        frames += 1
     
     pygame.quit()
     if GENERATEGRAPH:
