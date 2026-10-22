@@ -10,10 +10,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
     pheromones:dict[str|int,float] = {}
     for pheromone in PHEROMONES:
         pheromones[pheromone] = value
-    if nest is None:
-        for nest_node in nests:
-            pheromones[nest_node] = value
-    else:
+    if nest is not None:
         pheromones[nest] = value
     return pheromones
 
@@ -72,25 +69,33 @@ class Path:
         return f"Path(origin={nodes[self.origin]},destination={nodes[self.destination]},pheromones={self.pheromones})"
      
     def fetch_origin(self) -> tuple[float,float]:
-        self.origin_pos = (nodes[self.origin].x, nodes[self.origin].y)
+        if self.origin_pos is None:
+            self.origin_pos = (nodes[self.origin].x, nodes[self.origin].y)
         return self.origin_pos
     
     def fetch_destination(self) -> tuple[float,float]:
-        self.destination_pos = nodes[self.destination].x, nodes[self.destination].y
+        if self.destination_pos is None:
+            self.destination_pos = nodes[self.destination].x, nodes[self.destination].y
         return self.destination_pos
         
     def draw(self, surface: pygame.Surface, origin:tuple[float,float] = (0,0), scale:float = 1) -> None:
-        start = self.origin_pos if self.origin_pos is not None else self.fetch_origin()
-        end = self.destination_pos if self.destination_pos is not None else self.fetch_destination()
+        start = self.fetch_origin()
+        end = self.fetch_destination()
         ramp = lambda x: round(255-(1/(path_colour_ramp*(x+1/(path_colour_ramp*255))))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
-        nest_pheromone_sum = 0#ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys()))
-        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start[0]-origin[0])*scale,surface.get_height()-(start[1]-origin[1])*scale), end_pos=((end[0]-origin[0])*scale,surface.get_height()-(end[1]-origin[1])*scale), width=PATHWIDTH)
+        nest_pheromone_sum = 0#ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys())) # DOUBLES DRAWTIME
+        #pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start[0]-origin[0])*scale,surface.get_height()-(start[1]-origin[1])*scale), end_pos=((end[0]-origin[0])*scale,surface.get_height()-(end[1]-origin[1])*scale), width=PATHWIDTH)
+
+    def get_pheromone(self, type: str|int) -> float:
+        if type in self.pheromones.keys():
+            return self.pheromones[type]
+        else:
+            return 0
 
     def increase_pheromones(self, type: str|int, amount: float) -> None:
-        if not type in self.pheromones.keys():
-            print(f"WARNING: given type not recognised by {self}. Creating new entry.")
-            self.pheromones[type] = 0
-        self.pheromones[type] += amount
+        if type not in self.pheromones.keys():
+            self.pheromones[type] = amount
+        else:
+            self.pheromones[type] += amount
         
     def evaporate_pheromones(self, rate:float = EVAPORATIONRATE) -> None:
         for key in self.pheromones.keys():
@@ -222,7 +227,7 @@ class Ant:
             path_weights: list[float] = []
             for path in connected_paths:
                 if path is not None:
-                    pheromone_amount = path.pheromones[need]/path.get_length()
+                    pheromone_amount = path.get_pheromone(need)/path.get_length()
                     if pheromone_amount != 0 and (previous_node is None or (previous_node != path.origin and previous_node != path.destination)):
                         path_weights.append(pheromone_amount)
                     else:
@@ -288,25 +293,15 @@ def write_json(file_path: str, nodes: list[Node], paths:list[Path]|None = None, 
             with open(file_path, "w") as f:
                 json.dump(dump, f, indent=2)
 
-def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],dict[tuple[int,int],Path],list[Ant],tuple[float,float,float,float]|None]:
+def load_json(file_path: str, ignore_paths:bool = False, ignore_ants:bool = False) -> tuple[dict[int,Node],tuple[float,float,float,float]|None]:
     with open(file_path, "r") as f:
         graph = json.load(f)
         
     bounds: tuple[float,float,float,float]|None = tuple([graph["bounds"][key] for key in ["minlat","minlon","maxlat","maxlon"]]) if "bounds" in graph.keys() else None
     
     nodes:dict[int,Node] = {node["id"]:Node(id=node["id"],x=node["x"],y=node["y"],facility=node["facility"],connections=node["connections"]) for node in graph["nodes"]}
-    
-    if not ignore_paths and "paths" not in graph.keys():
-        paths:dict[tuple[int,int],Path] = {(path["origin"],path["destination"]):Path(origin=path["origin"],destination=path["destination"],pheromones={int(key) if key.isdigit() else key:value for key,value in path["pheromones"].items()}) for path in graph["paths"]}
-    else:
-        paths:dict[tuple[int,int],Path] = {}
-    
-    if not ignore_ants and "ants" not in graph.keys():
-        ants:list[Ant] = [Ant(origin=ant["origin"],destination=ant["destination"],distance=ant["distance"],nest=ant["nest"],needs={int(key) if key.isdigit() else key:value for key,value in ant["needs"].items()},pheromones={int(key) if key.isdigit() else key:value for key,value in ant["pheromones"].items()},goal=ant["goal"]) for ant in graph["ants"]]
-    else:
-        ants:list[Ant] = []
         
-    return nodes,paths,ants,bounds
+    return nodes,bounds
           
 if __name__ == "__main__":
     if GENERATEGRAPH:
@@ -356,25 +351,23 @@ if __name__ == "__main__":
                 ants.append(Ant(origin=nest))
         print("Initiated ants")
     else:
-        nodes,paths,ants,bounds = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
+        nodes,bounds = load_json(GRAPHFILE, ignore_paths=True, ignore_ants=True)
         print("Loaded json")
         for node in nodes.values():
             if node.facility == "nest":
                 nests.append(node.id)
         print("Collected nests")
-        if len(paths) == 0:
-            completed_nodes: list[int] = []
-            for node in nodes.values():
-                for connection in node.connections:
-                    if connection not in completed_nodes:
-                        paths[(node.id,connection)] = Path(origin=node.id,destination=connection)
-                completed_nodes.append(node.id)
-            print("Initiated paths")
-        if len(ants) == 0:
-            for nest in nests:
-                for _ in range(random.randint(*ANTSPERNEST)):
-                    ants.append(Ant(origin=nest))
-            print("Initiated ants")
+        completed_nodes: list[int] = []
+        for node in nodes.values():
+            for connection in node.connections:
+                if connection not in completed_nodes:
+                    paths[(node.id,connection)] = Path(origin=node.id,destination=connection)
+            completed_nodes.append(node.id)
+        print("Initiated paths")
+        for nest in nests:
+            for _ in range(random.randint(*ANTSPERNEST)):
+                ants.append(Ant(origin=nest))
+        print("Initiated ants")
     pygame.init()
     if bounds is None or GENERATEGRAPH:
         screen = pygame.display.set_mode((WIDTH,HEIGHT))
@@ -392,7 +385,7 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     running = True
     frames = 0
-    while running and frames < 100:
+    while running and frames < 1000:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
