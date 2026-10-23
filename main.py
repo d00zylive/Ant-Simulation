@@ -14,7 +14,7 @@ def initiate_pheromone_dict(value:float = 0, nest:int|None = None) -> dict[str|i
         pheromones[nest] = value
     return pheromones
 
-FRAMERATE = 10
+FRAMERATE = 60
 WIDTH,HEIGHT = 1920,900
 MARGIN = 10
 NODECOLOURS:dict[str|None,pygame.typing.ColorLike] = {
@@ -34,7 +34,7 @@ GENERATEGRAPH = False
 GRAPHFILE = os.path.join(os.path.dirname(__file__),"export.json")
 ANTSPERNEST = (0,5)
 
-SIMSPEED = 100
+SIMSPEED = 1000
 ANTSPEED = 0.0001*SIMSPEED/FRAMERATE # degrees per second
 WANDERCHANCE = 0.005 # chance for every node to ignore pheromones
 REVERSEMODIFIER = 0
@@ -83,7 +83,7 @@ class Path:
         end = self.fetch_destination()
         ramp = lambda x: round(255-(1/(path_colour_ramp*(x+1/(path_colour_ramp*255))))) if x != 0 else 0 #lambda x: min(x/(self.get_length()*10),255)#
         nest_pheromone_sum = 0#ramp(sum(self.pheromones[pheromone] if isinstance(pheromone,int) else 0 for pheromone in self.pheromones.keys())) # DOUBLES DRAWTIME
-        pygame.draw.line(surface, color=(round(nest_pheromone_sum),round(ramp(self.pheromones["store"])),0), start_pos=((start[0]-origin[0])*scale,surface.get_height()-(start[1]-origin[1])*scale), end_pos=((end[0]-origin[0])*scale,surface.get_height()-(end[1]-origin[1])*scale), width=PATHWIDTH)
+        pygame.draw.line(surface, color=(round(nest_pheromone_sum),ramp(self.pheromones["store"]),0), start_pos=((start[0]-origin[0])*scale,surface.get_height()-(start[1]-origin[1])*scale), end_pos=((end[0]-origin[0])*scale,surface.get_height()-(end[1]-origin[1])*scale), width=PATHWIDTH)
 
     def get_pheromone(self, type: str|int) -> float:
         if type in self.pheromones.keys():
@@ -200,7 +200,7 @@ class Ant:
         if path is None:
             self.choose_destination()
             path = get_path(self.origin, self.destination)
-            assert path is not None
+            assert path is not None, f"no path between {self.origin} & {self.destination}"
         while self.distance >= path.get_length():
             if self.goal is not None and (self.destination == self.goal or nodes[self.destination].facility == self.goal) and self.needs[self.goal] > 0:
                 self.utilise_facility(self.destination)
@@ -219,7 +219,7 @@ class Ant:
             need = self.get_highest_need()
             self.goal = self.get_highest_need()
         assert need is not None
-        connected_paths = [get_path(self.origin, connection) for connection in nodes[self.origin].connections]
+        connected_paths = nodes[self.origin].get_paths()
         if random.random() >= WANDERCHANCE:
             path_weights: list[float] = []
             for path in connected_paths:
@@ -382,7 +382,7 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     running = True
     frames = 0
-    while running and frames < 100:
+    while running and frames < 1000:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -391,7 +391,7 @@ if __name__ == "__main__":
                     path_colour_ramp*=1.1
                     print(path_colour_ramp)
                 elif event.key == pygame.K_DOWN:
-                    path_colour_ramp*=(10/11)
+                    path_colour_ramp*=10/11
                     print(path_colour_ramp)
         screen.fill((255,255,255))
         
@@ -405,7 +405,7 @@ if __name__ == "__main__":
             ant.draw(screen, origin=origin, scale=scale)
         pygame.display.flip()
         clock.tick(FRAMERATE)
-        print(clock.get_fps())
+        # print(clock.get_fps())
         frames += 1
     
     pygame.quit()
